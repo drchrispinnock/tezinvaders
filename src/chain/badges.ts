@@ -2,16 +2,16 @@
 // score first reaches each threshold. Ids and thresholds mirror the list PUSHed in
 // contract/tezinvaders.tz. The pictures are the game's own sprites rendered to SVG. Explorers
 // and wallets (TzKT, Signet) only load token images from ipfs:// or public https URLs, not
-// inline data: URIs, so the token metadata points at hosted copies (BADGE_IMAGE_BASE; the
-// files are written by contract/scripts/export-badges.ts). The panel draws the same SVGs
-// from here as data URIs, with no network round trip.
+// inline data: URIs, so the token metadata points at hosted copies (BADGE_IMAGE_BASE: the
+// files contract/scripts/export-badges.ts writes to public/badges/, deployed with the site).
+// The panel draws the same SVGs from here as data URIs, with no network round trip.
 //
 // Imports carry the .ts extension so Node can run the generator on this file directly.
 
 import { BANK, BANK_COLOR, BANK_SHADE, KINDS, bitmapSize, type Bitmap } from "../game/sprites.ts";
 
-/** Where the hosted badge SVGs live: `${BADGE_IMAGE_BASE}${slug}.svg`. A GitHub Pages site of just those files. */
-export const BADGE_IMAGE_BASE = "https://drchrispinnock.github.io/tezinvaders-badges/";
+/** Where the hosted badge SVGs live: `${BADGE_IMAGE_BASE}${slug}.svg`, i.e. public/badges/ on the game's own GitHub Pages site. */
+export const BADGE_IMAGE_BASE = "https://drchrispinnock.github.io/tezinvaders/badges/";
 
 export interface Badge {
   readonly id: number;

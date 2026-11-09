@@ -22,7 +22,7 @@ npm run contract:test       # contract/scripts/test-mockup.sh: originate + exerc
 npm run contract:deploy     # ADMIN=<alias> [ENDPOINT=…] [FEE_MUTEZ=…] [ROUND_LENGTH=<s>] contract/scripts/deploy.sh
 node contract/scripts/storage.ts --admin tz1…   # print the initial storage literal (used by both scripts)
 node contract/scripts/storage.ts --token-info 2 # one badge's token_info literal, for set_token_metadata
-node contract/scripts/export-badges.ts          # write the badge SVGs to public/badges/ (then copy to the Pages repo)
+node contract/scripts/export-badges.ts          # write the badge SVGs to public/badges/
 CONTRACT=KT1… SIGNER=<alias> contract/scripts/end-round.sh   # cron-able: calls end_round once the deadline has passed
 ```
 
@@ -35,11 +35,21 @@ mockup chain's `NOW` is stuck at the epoch, so deadline tests originate with exp
 `--round-ends` values.
 
 Runtime config comes from `.env` (see `.env.example`): per network, `VITE_RPC_URL_<NET>` and
-`VITE_CONTRACT_ADDRESS_<NET>` for `SHADOWNET` and `MAINNET`. The panel has a Shadownet / Mainnet
+`VITE_CONTRACT_ADDRESS_<NET>` for `SHADOWNET` and `MAINNET`. `.env.production` is committed
+(the values are public) and is what `vite build` and the Pages workflow use. The panel has a Shadownet / Mainnet
 toggle, Shadownet by default, persisted in `localStorage`; switching disconnects the wallet and
 reloads the page because the Octez Connect client and toolkit are bound to one network. (Ghostnet no
 longer exists.) With no valid KT1 address for the active network the panel says so and the game
 is free play only.
+
+## Hosting
+
+`.github/workflows/pages.yml` builds on every push to `main` and deploys `dist/` to GitHub
+Pages at https://drchrispinnock.github.io/tezinvaders/. The workflow sets `BASE_PATH` so Vite
+emits `/tezinvaders/`-prefixed URLs; locally the base stays `/`. Anything that builds a URL
+in code must go through `import.meta.env.BASE_URL` (see the panel's logo). Pages has to be
+enabled once with "GitHub Actions" as the source. Badge images ship with the site from
+`public/badges/`, and the token metadata on chain names that URL.
 
 ## Architecture
 
@@ -98,10 +108,10 @@ which are per-cell bitmaps eroded by `eraseBlob`.
 - `badges.ts` — the five badges (id, slug, name, threshold, sprite) and `badgeSvg()` /
   `badgeDataUri()`, which render the game's own bitmaps to SVG. The panel draws those data
   URIs locally, so it needs no token-metadata reads. The on-chain token metadata instead
-  points at hosted copies, `BADGE_IMAGE_BASE` + `<slug>.svg`, a GitHub Pages site built from
-  the sibling repo `~/tezos/tezinvaders-badges` (files written by
-  `contract/scripts/export-badges.ts`): TzKT and Signet only load `ipfs://` or public https
-  images and show a placeholder for `data:` URIs. Thresholds must match the list `PUSH`ed in
+  points at hosted copies, `BADGE_IMAGE_BASE` + `<slug>.svg`: the files
+  `contract/scripts/export-badges.ts` writes to `public/badges/`, published with the site on
+  GitHub Pages. TzKT and Signet only load `ipfs://` or public https images and show a
+  placeholder for `data:` URIs. Thresholds must match the list `PUSH`ed in
   the contract's `submit_score`. If the images move, the admin calls `set_token_metadata`
   with the literal from `storage.ts --token-info <id>`; no redeploy needed.
 
@@ -161,6 +171,7 @@ position (the last five numbers of the storage print) and must follow too.
   number. The planned fix is a verifier key whose signed score attestation the contract checks.
 - Nothing calls `end_round` automatically when the deadline passes: the panel shows everyone
   the button, and `contract/scripts/end-round.sh` can be run from cron.
-- Badge pictures are hosted on GitHub Pages, not on chain; if that site disappears the
-  tokens lose their images until the admin repoints them with `set_token_metadata`.
+- Badge pictures are hosted with the site on GitHub Pages, not on chain; if the site moves
+  the admin repoints the tokens with `set_token_metadata` (literal from
+  `storage.ts --token-info <id> --image-base <new base>`).
 - Winner takes the whole pool; no split, no rake.

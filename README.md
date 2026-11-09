@@ -30,8 +30,15 @@ does the same from cron. The pool goes in full to the round's top scorer.
 
 Scores also earn badges: FA2 tokens the contract mints the first time a player's all-time best
 reaches 1,000 ($), 3,000 (€), 5,000 (£), 8,000 (¥) and 12,000 (the mothership). They show in
-the panel and in any wallet or explorer that lists FA2 tokens; the images are served from the
-`tezinvaders-badges` GitHub Pages site (regenerate them with `node contract/scripts/export-badges.ts`).
+the panel and in any wallet or explorer that lists FA2 tokens; the images are served with the
+site from `public/badges/` (regenerate them with `node contract/scripts/export-badges.ts`).
+
+## Hosting
+
+Pushing to `main` builds and deploys the site to GitHub Pages
+(https://drchrispinnock.github.io/tezinvaders/) via `.github/workflows/pages.yml`. Enable Pages
+once with "GitHub Actions" as the source. Build-time config lives in the committed
+`.env.production`.
 
 The panel has a Shadownet / Mainnet toggle; Shadownet is the default. Each network has its own
 contract address in `.env` (`VITE_CONTRACT_ADDRESS_MAINNET` for Mainnet, deployed with

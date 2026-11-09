@@ -1,6 +1,6 @@
 // Writes the five badge SVGs to a directory (default public/badges/, which Vite serves at
-// /badges/<slug>.svg). The same files are pushed to the GitHub Pages site named by
-// BADGE_IMAGE_BASE in src/chain/badges.ts, which is where the token metadata points.
+// /badges/<slug>.svg and the Pages deploy publishes at BADGE_IMAGE_BASE, where the token
+// metadata points). Re-run it whenever the sprites change, then redeploy the site.
 //
 //   node contract/scripts/export-badges.ts [out-dir]
 

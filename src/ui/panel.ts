@@ -125,7 +125,7 @@ export class Panel {
       `<tr class="${c.player === me ? "me" : ""}"><td>R${c.round}</td><td title="${c.player}">${shortAddress(c.player)}</td><td>${c.score}</td></tr>`).join("");
 
     this.root.innerHTML = `
-      <h1><img class="logo" src="/tezos.svg" alt="" width="18" height="24" /> TEZINVADERS</h1>
+      <h1><img class="logo" src="${import.meta.env.BASE_URL}tezos.svg" alt="" width="18" height="24" /> TEZINVADERS</h1>
       <section><div class="row"><h2>Wallet</h2>${networkHtml}</div>${walletHtml}</section>
       <section><h2>Prize pool</h2>${poolHtml}</section>
       ${badgesHtml}
