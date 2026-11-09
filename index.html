@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>TezInvaders</title>
+    <link rel="icon" type="image/svg+xml" href="/tezos.svg" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="/src/style.css" />
+  </head>
+  <body>
+    <main id="app">
+      <section class="stage">
+        <canvas id="game" width="560" height="640" tabindex="0" aria-label="TezInvaders game"></canvas>
+        <p class="controls">← → or A/D move · SPACE fire · ENTER start · P pause · M mute</p>
+      </section>
+      <aside id="panel" class="panel"></aside>
+    </main>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
