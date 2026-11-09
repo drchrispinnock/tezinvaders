@@ -44,12 +44,22 @@ is free play only.
 
 ## Hosting
 
-`.github/workflows/pages.yml` builds on every push to `main` and deploys `dist/` to GitHub
-Pages at https://drchrispinnock.github.io/tezinvaders/. The workflow sets `BASE_PATH` so Vite
-emits `/tezinvaders/`-prefixed URLs; locally the base stays `/`. Anything that builds a URL
-in code must go through `import.meta.env.BASE_URL` (see the panel's logo). Pages has to be
-enabled once with "GitHub Actions" as the source. Badge images ship with the site from
-`public/badges/`, and the token metadata on chain names that URL.
+Two targets, both static:
+
+- **AWS**: `deploy/aws-site.yml` (CloudFormation: private S3 bucket + CloudFront with an
+  Origin Access Control and a security-headers policy; no CSP yet, because Octez Connect
+  pairing talks to relay hosts that would need listing). `deploy/aws-deploy.sh`
+  (`npm run deploy:aws`) builds, syncs `dist/` with long cache headers on `assets/` and
+  revalidation on the rest, and invalidates the distribution. The site is served from `/`,
+  so no base path.
+- **GitHub Pages**: `.github/workflows/pages.yml` builds on every push to `main` with
+  `BASE_PATH=/tezinvaders/` so Vite emits prefixed URLs; locally the base stays `/`.
+  Anything that builds a URL in code must go through `import.meta.env.BASE_URL` (see the
+  panel's logo). Pages has to be enabled once with "GitHub Actions" as the source.
+
+Badge images ship with the site from `public/badges/`; `BADGE_IMAGE_BASE` in
+`src/chain/badges.ts` and the token metadata on chain must name whichever host is live
+(repoint with `set_token_metadata`, literal from `storage.ts --token-info <id> --image-base …`).
 
 ## Architecture
 

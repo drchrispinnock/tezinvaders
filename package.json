@@ -11,7 +11,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "contract:test": "contract/scripts/test-mockup.sh",
-    "contract:deploy": "contract/scripts/deploy.sh"
+    "contract:deploy": "contract/scripts/deploy.sh",
+    "deploy:aws": "deploy/aws-deploy.sh"
   },
   "devDependencies": {
     "typescript": "^5.9.0",
