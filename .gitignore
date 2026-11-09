@@ -4,3 +4,5 @@ dist/
 .env.local
 contract/.mockup/
 .DS_Store
+/tmp
+*.swp

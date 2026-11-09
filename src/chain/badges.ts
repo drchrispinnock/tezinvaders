@@ -10,8 +10,8 @@
 
 import { BANK, BANK_COLOR, BANK_SHADE, KINDS, bitmapSize, type Bitmap } from "../game/sprites.ts";
 
-/** Where the hosted badge SVGs live: `${BADGE_IMAGE_BASE}${slug}.svg`, i.e. public/badges/ on the game's own GitHub Pages site. */
-export const BADGE_IMAGE_BASE = "https://drchrispinnock.github.io/tezinvaders/badges/";
+/** Where the hosted badge SVGs live: `${BADGE_IMAGE_BASE}${slug}.svg`, i.e. public/badges/ on the live site. */
+export const BADGE_IMAGE_BASE = "https://tezinvaders.xyz/badges/";
 
 export interface Badge {
   readonly id: number;
