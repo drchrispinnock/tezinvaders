@@ -81,9 +81,12 @@ Each network has its own URL: `/shadownet`, `/shadownet/tezosx` (Tezos X, the Et
 rollup's Michelson interface, which runs the same contract), `/mainnet`, `/mainnet/tezosx`;
 `/` redirects to Shadownet until Mainnet is live. The panel's network dropdown and L1 / L2
 toggle just navigate between them. Networks, RPCs and contract addresses are listed in
-`src/chain/networks.json`; to add one, originate with the matching `ENDPOINT=` (for example
-`https://rpc.tzkt.io/mainnet` or `https://michelson.etherlink.shadownet.octez.io`) and add an
-entry (its `name` must be an Octez Connect network type).
+`src/chain/networks.json`. To add a testnet, add an entry (its `name` must be an Octez Connect
+network type; `faucet` is optional), fund the admin alias there, and run
+`npm run contract:deploy-network -- <name>`: it originates, waits for that network's TzKT to
+index the contract, writes the KT1 into the JSON and tells you to redeploy the site. The L1 / L2
+toggle only appears for chains that have a Tezos X entry, and `layerSwitch: false` in the JSON
+hides it everywhere.
 To fund the admin on Tezos X, bridge tez from L1: a transfer to the network's bridge helper
 (Shadownet `KT19aBsSWvWtvEkbiqReJnD8UzQMWcD8SHUD`, rollup `sr19fMYrr5C4qqvQqQrDSjtP31GcrWjodzvg`)
 calling `deposit` with the rollup address and the RLP routing data for the tz1 receiver; Signet's

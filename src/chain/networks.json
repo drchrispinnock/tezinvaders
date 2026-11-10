@@ -1,5 +1,6 @@
 {
   "default": "shadownet",
+  "layerSwitch": true,
   "networks": [
     {
       "name": "mainnet", "chain": "mainnet", "layer": "l1", "label": "Mainnet", "path": "/mainnet",
@@ -21,6 +22,12 @@
       "name": "tezosx-shadownet", "chain": "shadownet", "layer": "l2", "label": "Tezos X Shadownet", "path": "/shadownet/tezosx",
       "chainId": "NetXtLrzvQDobza", "rpcUrl": "https://michelson.etherlink.shadownet.octez.io", "contractAddress": "KT1NF4YLSaEoALXBbAVJKwznKeo2Eh9QPg2D",
       "tzktApi": "https://api.shadownet.etherlink.tzkt.io", "explorer": "https://shadownet.etherlink.tzkt.io"
+    },
+    {
+      "name": "ushuaianet", "chain": "ushuaianet", "layer": "l1", "label": "Ushuaianet", "path": "/ushuaianet",
+      "chainId": "NetXpX8WSZkAZZA", "rpcUrl": "https://rpc.ushuaianet.teztnets.com", "contractAddress": "",
+      "tzktApi": "https://api.ushuaianet.tzkt.io", "explorer": "https://ushuaianet.tzkt.io",
+      "faucet": "https://faucet.ushuaianet.teztnets.com"
     }
   ]
 }

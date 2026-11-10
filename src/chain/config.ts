@@ -39,6 +39,8 @@ export const NETWORK_LIST: readonly Network[] = (table.networks as Network[]).ma
 }));
 export const NETWORKS: Readonly<Record<NetworkName, Network>> = Object.fromEntries(NETWORK_LIST.map((n) => [n.name, n]));
 export const DEFAULT_NETWORK: NetworkName = table.default;
+/** Whether the panel offers the L1 / L2 toggle at all (networks.json `layerSwitch`); chains without an L2 entry never show it. */
+export const LAYER_SWITCH: boolean = table.layerSwitch !== false;
 
 /** The chains with their labels, L1 first in the table; and whether each has an L2. */
 export const CHAINS: readonly { name: Chain; label: string; hasL2: boolean }[] = NETWORK_LIST

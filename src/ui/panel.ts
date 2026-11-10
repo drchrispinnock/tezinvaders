@@ -1,5 +1,5 @@
 import { BADGES, badgeDataUri, badgeFor } from "../chain/badges";
-import { CHAINS, DEFAULT_NETWORK, LAYERS, config, formatTez, hasContract, isLayer, networkFor, pathFor, shortAddress, type NetworkName } from "../chain/config";
+import { CHAINS, DEFAULT_NETWORK, LAYERS, LAYER_SWITCH, config, formatTez, hasContract, isLayer, networkFor, pathFor, shortAddress, type NetworkName } from "../chain/config";
 import { roundOver, type GameStorage, type PlayerState, type ScoreEntry } from "../chain/contract";
 import type { GameRecord } from "../chain/verifier";
 import { aliasOf } from "../chain/tzkt";
@@ -99,11 +99,12 @@ export class Panel {
     const dis = s.busy ? "disabled" : "";
 
     const hasL2 = CHAINS.find((c) => c.name === config.chain)?.hasL2 ?? false;
+    const layerHtml = !LAYER_SWITCH || !hasL2 ? "" : `<div class="seg" role="group" aria-label="Layer">${LAYERS.map((l) =>
+        `<button data-layer="${l.name}" class="${l.name === config.layer ? "on" : ""}" ${dis} aria-pressed="${l.name === config.layer}" title="${l.title}">${l.label}</button>`).join("")}</div>`;
     const networkHtml = `<div class="segs">
       <select data-chain aria-label="Network" ${dis}>${CHAINS.map((c) =>
         `<option value="${c.name}" ${c.name === config.chain ? "selected" : ""}>${c.label}</option>`).join("")}</select>
-      <div class="seg" role="group" aria-label="Layer">${LAYERS.map((l) =>
-        `<button data-layer="${l.name}" class="${l.name === config.layer ? "on" : ""}" ${dis} ${l.name === "l2" && !hasL2 ? "disabled" : ""} aria-pressed="${l.name === config.layer}" title="${l.name === "l2" && !hasL2 ? `No Tezos X on ${config.label}` : l.title}">${l.label}</button>`).join("")}</div></div>`;
+      ${layerHtml}</div>`;
 
     const walletHtml = me
       ? `<div class="row"><span class="addr">${explorerLink(me)}</span>

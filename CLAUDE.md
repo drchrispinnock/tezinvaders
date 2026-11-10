@@ -20,6 +20,7 @@ npm test                    # vitest, all tests (src/**/*.test.ts)
 npx vitest run src/game/sim.test.ts -t "reverses"   # single test by file and name pattern
 npm run contract:test       # contract/scripts/test-mockup.sh: originate + exercise the contract on an octez-client mockup chain
 npm run contract:deploy     # ADMIN=<alias> VERIFIER=edpk… [ENDPOINT=…] [WAIT=none on Tezos X] [FEE_MUTEZ=…] [ROUND_LENGTH=<s>, default 86400]
+npm run contract:deploy-network -- <name>   # originate on one networks.json entry (funding check, waits for TzKT, writes the KT1 back)
 node contract/scripts/storage.ts --admin tz1… --verifier edpk…   # print the initial storage literal (used by both scripts)
 npm run verifier:keygen     # a verifier key pair; the edpk goes to the contract, the edsk to the verifier's environment
 VERIFIER_SECRET_KEY=edsk… npm run verifier   # the score verifier on http://localhost:8787 (VITE_VERIFIER_URL in .env)
@@ -44,7 +45,11 @@ rollup's Michelson interface: same contracts, same tz keys, RPCs at
 michelson.etherlink.<chain>.octez.io). The URL picks the network: `/shadownet`,
 `/shadownet/tezosx`, `/mainnet`, `/mainnet/tezosx`; `/` and unknown paths redirect to the
 `default` entry (Shadownet until Mainnet is live). Adding a testnet is one JSON entry (its
-`name` must be an Octez Connect `NetworkType` value) plus an origination. `.env` may override
+`name` must be an Octez Connect `NetworkType` value; `faucet` is optional and shown in the
+panel) and `npm run contract:deploy-network -- <name>`, which refuses to run until the admin
+holds tez there, originates, waits for the network's TzKT to index the KT1 and writes it into
+the JSON; then redeploy the site. `layerSwitch` in the JSON hides the L1 / L2 toggle everywhere
+when false; a chain with no L2 entry never shows it (Ushuaianet has no Etherlink). `.env` may override
 a contract address (`VITE_CONTRACT_ADDRESS_<NAME>`) for local work and holds the verifier URL. Deploying there: fund the
 admin by bridging from L1 (see README), originate with `ENDPOINT=<L2 rpc>`; octez-client hangs
 waiting for the confirmation, so stop it and read the KT1 from api.<chain>.etherlink.tzkt.io.
