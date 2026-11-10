@@ -1,14 +1,23 @@
-// A sample Advent door in the game's pixel style: one of the invaders in a Santa hat on a snowy
-// night, with the day number. Placeholder art until the real 24 designs exist; the output is
-// public/badges/advent/<NN>.svg, the files the token metadata will point at.
+// The 25 Advent doors as SVGs in the game's pixel style, written to public/badges/advent/NN.svg
+// (the files the token metadata points at):
+//   1-5   the game's invaders and the mothership, in Santa hats
+//   6-15  other currencies of the world
+//   16-20 Ms BLS, Captain Stake, the Glorious Testnet Dictator, The Rollup Dude, Farrah Faucet
+//   21-23 the Signet ring, the Etherlink mark, the Tezos ꜩ
+//   24-25 Christmas pudding, Christmas tree
 //
 //   node contract/scripts/advent-image.ts <day 1-25> [--all]
 
-import { mkdirSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { LOGO_PATH } from "../../src/game/logo.ts";
 import { BANK, BANK_COLOR, BANK_SHADE, KINDS, bitmapSize, type Bitmap } from "../../src/game/sprites.ts";
 
 const SIZE = 64;
 const BG = "#05070f", SNOW = "#e6e9f5", GOLD = "#ffd34d", RED = "#e8333f", DARK_RED = "#9c1f28";
+const SKIN = "#f5c9a0", GREEN = "#2fbf5a", DARK_GREEN = "#1d8a3f", BROWN = "#7a4a1f", TEZ = "#2c7df7";
+
+type Palette = Record<string, string>;
+interface Design { bitmap?: Bitmap; palette?: Palette; hat?: boolean; svg?: string }
 
 const DIGITS: Record<string, Bitmap> = {
   "0": ["###", "#.#", "#.#", "#.#", "###"], "1": [".#.", "##.", ".#.", ".#.", "###"], "2": ["###", "..#", "###", "#..", "###"],
@@ -16,14 +25,110 @@ const DIGITS: Record<string, Bitmap> = {
   "6": ["###", "#..", "###", "#.#", "###"], "7": ["###", "..#", "..#", "..#", "..#"], "8": ["###", "#.#", "###", "#.#", "###"],
   "9": ["###", "#.#", "###", "..#", "###"],
 };
-const HAT: Bitmap = [
-  "......##..",
-  "....####..",
-  "...#####..",
-  "..######..",
-  ".#######..",
-  "oooooooooo",
-];
+const HAT: Bitmap = ["......##..", "....####..", "...#####..", "..######..", ".#######..", "oooooooooo"];
+
+// ---- Currencies (16x16 glyphs) --------------------------------------------------------------
+const RUPEE: Bitmap = [
+  "................", "...##########...", "...##########...", ".......###......", "...##########...", "...##########...",
+  ".......###......", "......###.......", ".....###........", "....###.........", "...###..........", "..###...........",
+  "................", "................", "................", "................"];
+const WON: Bitmap = [
+  "................", "..##........##..", "..##........##..", "..##...##...##..", ".##############.", ".##############.",
+  "...##.#..#.##...", "...##.#..#.##...", ".##############.", ".##############.", "....##....##....", "....##....##....",
+  ".....##..##.....", "......####......", "................", "................"];
+const RUBLE: Bitmap = [
+  "................", "....########....", "....##.....##...", "....##......##..", "....##......##..", "....##.....##...",
+  "..############..", "..############..", "....##..........", "..########......", "..########......", "....##..........",
+  "....##..........", "....##..........", "................", "................"];
+const LIRA: Bitmap = [
+  "................", "......##........", "......##........", "......##..##....", "......##.##.....", "......####......",
+  "...##.##........", "..##..##........", "......##........", "......##........", "......##......##", "......##.....##.",
+  "......##....##..", ".......######...", "................", "................"];
+const SHEKEL: Bitmap = [
+  "................", ".######...####..", ".##..##......##.", ".##..##......##.", ".##..##......##.", ".##..##......##.",
+  ".##..##......##.", ".##..##......##.", ".##..........##.", ".##..##......##.", ".##..##......##.", ".##..##......##.",
+  ".##...####...##.", "................", "................", "................"];
+const BAHT: Bitmap = [
+  "................", ".......##.......", "....#######.....", "....##..##.##...", "....##..##..##..", "....##..##..##..",
+  "....##..##.##...", "....#######.....", "....##..##.##...", "....##..##..##..", "....##..##..##..", "....##..##.##...",
+  "....#######.....", ".......##.......", "................", "................"];
+const NAIRA: Bitmap = [
+  "................", "..##........##..", "..###.......##..", "..####......##..", ".##############.", ".##############.",
+  "..##..##....##..", "..##...##...##..", ".##############.", ".##############.", "..##.....##.##..", "..##......####..",
+  "..##.......###..", "..##........##..", "................", "................"];
+const PESO: Bitmap = [
+  "................", "..########......", "..##.....##.....", ".#############..", ".#############..", "..##.....##.....",
+  ".#############..", ".#############..", "..########......", "..##............", "..##............", "..##............",
+  "..##............", "..##............", "................", "................"];
+const HRYVNIA: Bitmap = [
+  "................", ".....######.....", "....##....##....", "....##..........", ".....####.......", "..############..",
+  "..############..", "........####....", "..############..", "..############..", "..........##....", "....##....##....",
+  ".....######.....", "................", "................", "................"];
+const DONG: Bitmap = [
+  "................", "..........##....", "........######..", "..........##....", "..........##....", ".....#######....",
+  "....##....##....", "....##....##....", "....##....##....", ".....#######....", "................", "..############..",
+  "..############..", "................", "................", "................"];
+
+// ---- Characters (16x16; # hair/outfit, o skin, + detail, * accent) ----------------------------
+const MS_BLS: Bitmap = [
+  "....########....", "..############..", ".##############.", "###oooooooooo###", "###oooooooooo###", "##oo+oooooo+oo##",
+  "##oooooooooooo##", "##ooooo++ooooo##", "##oooooooooooo##", "###oo++++++oo###", "###oooooooooo###", ".###oooooooo###.",
+  "..##.oooooo.##..", ".....oooooo.....", "....*oooooo*....", "...**oooooo**..."];
+const CAPTAIN_STAKE: Bitmap = [
+  "......####......", ".....oooooo.....", "....oooooooo....", "....########....", "....#+####+#....", "....oooooooo....",
+  ".....oo++oo.....", "......oooo......", "...##*####*##...", "..###*#++#*###..", ".####*#++#*####.", ".####*####*####.",
+  ".####*####*####.", "..##..####..##..", "......####......", "......#..#......"];
+const DICTATOR: Bitmap = [
+  "....########....", "...##########...", "..####*####*##..", "..############..", ".##############.", "....oooooooooo..",
+  "...oooooooooooo.", "...o##########o.", "...oo##oooo##oo.", "...oooooooooooo.", "...oo+++++++oo..", "...ooooooooooo..",
+  "....oooo+ooooo..", ".....oooooooo...", "....##*####*##..", "...###*####*###."];
+const ROLLUP_DUDE: Bitmap = [
+  "....########....", "...##########...", "...##*######*#..", "...oooooooooo...", "..oooooooooooo..", "..o##########o..",
+  "..o##oo##oo##o..", "..oooooooooooo..", "..ooo++++++ooo..", "...oooooooooo...", "....oooooooo....", "...##++++++##...",
+  "..##++++++++##..", ".#+..******..+#.", ".#+..******..+#.", "................"];
+const FARRAH: Bitmap = [
+  "..####....####..", ".######..######.", ".######oo######.", ".#####oooo#####.", ".####oooooo####.", ".####o+oo+o####.",
+  ".####oooooo####.", ".####ooo+oo####.", ".#####oooo#####.", ".######oo######.", ".###...##...###.", ".##....++....##.",
+  ".......++..*****", "......++++.....*", "...............*", "..............*."];
+
+// ---- Festive --------------------------------------------------------------------------------
+const PUDDING: Bitmap = [
+  ".......*........", "......+*+.......", ".....++.++......", "...oooooooooo...", "..oooooooooooo..", ".oooooooooooooo.",
+  ".oo#oooo#ooooo#.", ".##o####o#####o.", ".####o#########.", ".##############.", ".##############.", ".##############.",
+  "..############..", "...##########...", "....########....", "................"];
+const TREE: Bitmap = [
+  ".......*........", "......***.......", ".......#........", "......###.......", ".....##+##......", "....#######.....",
+  "...##+####+#....", "......#####.....", ".....##+####....", "....#######+#...", "...###########..", "..#+#########+#.",
+  ".###############", ".......oo.......", ".......oo.......", "......oooo......"];
+
+const glyph = (bitmap: Bitmap, color: string): Design => ({ bitmap, palette: { "#": color }, hat: true });
+const person = (bitmap: Bitmap, hair: string, detail: string, accent: string): Design =>
+  ({ bitmap, palette: { "#": hair, o: SKIN, "+": detail, "*": accent }, hat: true });
+
+const SIGNET_PNG = readFileSync(new URL("../assets/signet-128.png", import.meta.url)).toString("base64");
+const ETHERLINK = readFileSync(new URL("../assets/etherlink.svg", import.meta.url), "utf8")
+  .replace(/<\?xml[^>]*>/, "").replace(/<svg[^>]*>/, "").replace("</svg>", "")
+  .replace(/<defs>[\s\S]*?<\/defs>/, "").replace(/class="cls-1"/g, 'fill="#262626"').replace(/class="cls-2"/g, 'fill="#38ff9c"');
+
+const DESIGNS: Record<number, Design> = {
+  1: { bitmap: KINDS.dollar.frames[0], palette: { "#": KINDS.dollar.color }, hat: true },
+  2: { bitmap: KINDS.euro.frames[0], palette: { "#": KINDS.euro.color }, hat: true },
+  3: { bitmap: KINDS.pound.frames[0], palette: { "#": KINDS.pound.color }, hat: true },
+  4: { bitmap: KINDS.yen.frames[0], palette: { "#": KINDS.yen.color }, hat: true },
+  5: { bitmap: BANK, palette: { "#": BANK_COLOR, o: BANK_SHADE }, hat: true },
+  6: glyph(RUPEE, "#ff8c42"), 7: glyph(WON, "#5ad1ff"), 8: glyph(RUBLE, "#ff4d6d"), 9: glyph(LIRA, "#ff6b6b"), 10: glyph(SHEKEL, "#4db8ff"),
+  11: glyph(BAHT, "#c77dff"), 12: glyph(NAIRA, "#3ddc84"), 13: glyph(PESO, "#ffd34d"), 14: glyph(HRYVNIA, "#ffe66d"), 15: glyph(DONG, "#ff9f1c"),
+  16: person(MS_BLS, "#c0392b", "#2c3e50", "#ffd34d"),
+  17: person(CAPTAIN_STAKE, "#2c7df7", "#ffd34d", "#e8333f"),
+  18: person(DICTATOR, "#4b5320", "#2c3e50", "#ffd34d"),
+  19: person(ROLLUP_DUDE, "#7f88a8", "#2c3e50", "#e6e9f5"),
+  20: person(FARRAH, "#f0c419", "#2c3e50", "#5ad1ff"),
+  21: { svg: `<image href="data:image/png;base64,${SIGNET_PNG}" x="8" y="6" width="48" height="48" image-rendering="auto"/>` },
+  22: { svg: `<svg x="10" y="8" width="44" height="44" viewBox="0 0 1080 1080">${ETHERLINK}</svg>` },
+  23: { svg: `<svg x="17" y="8" width="30" height="42" viewBox="0 0 47 64"><path fill="${TEZ}" d="${LOGO_PATH}"/></svg>` },
+  24: { bitmap: PUDDING, palette: { "#": BROWN, o: SNOW, "+": DARK_GREEN, "*": RED } },
+  25: { bitmap: TREE, palette: { "#": GREEN, o: BROWN, "+": RED, "*": GOLD } },
+};
 
 /** Horizontal runs of `ch` in `bitmap` as a path, offset by (ox, oy). */
 function runs(bitmap: Bitmap, ch: string, ox: number, oy: number): string {
@@ -51,18 +156,22 @@ function prng(seed: number): () => number {
 }
 
 export function adventSvg(day: number): string {
-  const sprites = [KINDS.dollar, KINDS.euro, KINDS.pound, KINDS.yen] as const;
-  const pick = (day - 1) % 5;
-  const bitmap: Bitmap = pick === 4 ? BANK : sprites[pick]!.frames[0];
-  const color = pick === 4 ? BANK_COLOR : sprites[pick]!.color;
-  const shade = pick === 4 ? BANK_SHADE : color;
-  const { w, h } = bitmapSize(bitmap);
-  const ox = Math.floor((SIZE - w) / 2), oy = 24;
+  const design = DESIGNS[day];
+  if (!design) throw new Error(`no design for door ${day}`);
   const rnd = prng(day * 7919);
   let snow = "";
-  for (let i = 0; i < 28; i++) {
-    const x = Math.floor(rnd() * SIZE), y = Math.floor(rnd() * 48);
-    snow += `M${x} ${y}h1v1h-1z`;
+  for (let i = 0; i < 28; i++) snow += `M${Math.floor(rnd() * SIZE)} ${Math.floor(rnd() * 48)}h1v1h-1z`;
+  let art = design.svg ?? "";
+  if (design.bitmap) {
+    const { w, h } = bitmapSize(design.bitmap);
+    const scale = w <= 16 ? 2 : 1;                       // 16x16 glyphs are shown at 2x; wider sprites at 1x
+    const ox = Math.floor((SIZE - w * scale) / 2), oy = design.hat ? 24 : 14;
+    const layers = Object.entries(design.palette ?? {}).map(([ch, color]) => layer(design.bitmap!, ch, 0, 0, color)).join("");
+    art += `<g transform="translate(${ox} ${oy}) scale(${scale})">${layers}</g>`;
+    if (design.hat) {
+      const hx = ox + Math.floor((w * scale - 10) / 2) + 2, hy = oy - 6;
+      art += layer(HAT, "#", hx, hy, RED) + layer(HAT, "o", hx, hy, SNOW) + `<rect x="${hx + 6}" y="${hy - 1}" width="2" height="2" fill="${SNOW}"/>`;
+    }
   }
   const label = String(day);
   const digitsW = label.length * 4 - 1;
@@ -72,9 +181,7 @@ export function adventSvg(day: number): string {
     `<path fill="${SNOW}" opacity="0.7" d="${snow}"/>` +
     `<rect x="0" y="${SIZE - 6}" width="${SIZE}" height="6" fill="${SNOW}"/>` +
     `<rect x="1" y="1" width="${SIZE - 2}" height="${SIZE - 2}" fill="none" stroke="${GOLD}" stroke-width="1"/>` +
-    layer(bitmap, "#", ox, oy, color) + layer(bitmap, "o", ox, oy, shade) +
-    layer(HAT, "#", ox + Math.floor((w - 10) / 2) + 2, oy - 6, RED) + layer(HAT, "o", ox + Math.floor((w - 10) / 2) + 2, oy - 6, SNOW) +
-    `<rect x="${ox + Math.floor((w - 10) / 2) + 8}" y="${oy - 7}" width="2" height="2" fill="${SNOW}"/>` +
+    art +
     `<rect x="${SIZE - 9 - digitsW}" y="${SIZE - 14}" width="${digitsW + 6}" height="9" fill="${DARK_RED}"/>` + digits +
     `</svg>`;
 }
