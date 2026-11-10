@@ -1,8 +1,10 @@
 import utils from "@tezos-x/octez.js-utils";
 const { verifySignature } = utils;
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { Sim, encodeLog, type Input } from "../src/game/sim";
 import { ATTESTATION_TTL_S, attest, attestationBytes, checkClaim, signClaim, verifierPublicKey, type AttestRequest } from "./attest";
+import { keyFor, keysFromEnv } from "./http";
 
 // A throwaway key made with verifier/keygen.ts.
 const SK = "edsk3QoqBuvdamxouPhin7swCvkQNgq4jP5KZPbwWNnwdZpSpJiEbq";
@@ -48,5 +50,25 @@ describe("attestation", () => {
     expect(checkClaim({ ...req, log: g.log.replace(/,[^,]*$/, "") })).toMatch(/did not end|replay scored/);
     expect(checkClaim({ ...req, player: "tz1nope" })).toBe("bad player address");
     await expect(attest(SK, { ...req, score: 1 })).rejects.toThrow(/replay scored/);
+  });
+});
+
+describe("post-quantum verifier key", () => {
+  it("signs and verifies with an ML-DSA-44 key, as the Quantumnet contract requires", async () => {
+    const pq = JSON.parse(readFileSync(new URL("./fixtures/mldsa-test-key.json", import.meta.url), "utf8")) as { secretKey: string; publicKey: string };
+    const claim = { chainId: "NetXhb8apwTcVhJ", contract: KT, player: TZ, score: 777, expires: 1700000000 };
+    const sig = await signClaim(pq.secretKey, claim);
+    expect(sig.startsWith("mdsig")).toBe(true);
+    expect(await verifierPublicKey(pq.secretKey)).toBe(pq.publicKey);
+    expect(verifySignature(attestationBytes(claim), pq.publicKey, sig)).toBe(true);
+    expect(verifySignature(attestationBytes({ ...claim, score: 778 }), pq.publicKey, sig)).toBe(false);
+  });
+
+  it("picks the chain's own key when one is configured", () => {
+    const keys = keysFromEnv({ VERIFIER_SECRET_KEY: SK, VERIFIER_SECRET_KEY_NetXhb8apwTcVhJ: SK, VERIFIER_SECRET_KEY_bogus: SK });
+    expect(Object.keys(keys.byChain)).toEqual(["NetXhb8apwTcVhJ"]);
+    expect(keyFor(keys, "NetXhb8apwTcVhJ")).toBe(SK);
+    expect(keyFor(keys, "NetXsqzbfFenSTS")).toBe(SK);
+    expect(() => keysFromEnv({})).toThrow(/VERIFIER_SECRET_KEY/);
   });
 });

@@ -88,6 +88,10 @@ wallet goes by the RPC URL; `faucet` is optional), fund the admin alias there, a
 index the contract, writes the KT1 into the JSON and tells you to redeploy the site. The L1 / L2
 toggle only appears for chains that have a Tezos X entry, and `layerSwitch: false` in the JSON
 hides it everywhere.
+
+Quantumnet is special twice: its protocol only accepts post-quantum keys in contracts, so its
+verifier key is ML-DSA-44 (the verifier gets it as `VERIFIER_SECRET_KEY_NetXhb8apwTcVhJ`), and
+Octez Connect has no name for it, so the wallet identifies it by RPC URL.
 To fund the admin on Tezos X, bridge tez from L1: a transfer to the network's bridge helper
 (Shadownet `KT19aBsSWvWtvEkbiqReJnD8UzQMWcD8SHUD`, rollup `sr19fMYrr5C4qqvQqQrDSjtP31GcrWjodzvg`)
 calling `deposit` with the rollup address and the RLP routing data for the tz1 receiver; Signet's

@@ -4,9 +4,9 @@
 // VITE_VERIFIER_URL at it.
 
 import { createServer } from "node:http";
-import { CORS_HEADERS, MAX_BODY_BYTES, handle, secretKeyFromEnv } from "./http.ts";
+import { CORS_HEADERS, MAX_BODY_BYTES, handle, keysFromEnv } from "./http.ts";
 
-const secretKey = secretKeyFromEnv();
+const keys = keysFromEnv();
 const port = Number(process.env.PORT ?? 8787);
 
 createServer((req, res) => {
@@ -17,7 +17,7 @@ createServer((req, res) => {
     body += chunk.toString("utf8");
   });
   req.on("end", () => {
-    void handle(req.method ?? "GET", new URL(req.url ?? "/", "http://x").pathname, tooLarge ? "x".repeat(MAX_BODY_BYTES + 1) : body, secretKey)
+    void handle(req.method ?? "GET", new URL(req.url ?? "/", "http://x").pathname, tooLarge ? "x".repeat(MAX_BODY_BYTES + 1) : body, keys)
       .then((r) => { res.writeHead(r.status, CORS_HEADERS); res.end(r.body); });
   });
 }).listen(port, () => console.log(`verifier listening on http://localhost:${port}`));

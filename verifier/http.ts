@@ -14,17 +14,27 @@ export const CORS_HEADERS = {
   "Content-Type": "application/json",
 };
 
-export async function handle(method: string, path: string, body: string, secretKey: string): Promise<HttpResult> {
+/**
+ * Signing keys: VERIFIER_SECRET_KEY by default, and VERIFIER_SECRET_KEY_<chainId> for a chain that needs
+ * its own (Quantumnet rejects ed25519 keys in contracts, so its contract holds an ML-DSA-44 mdpk).
+ */
+export interface VerifierKeys { default: string; byChain: Record<string, string> }
+
+export const keyFor = (keys: VerifierKeys, chainId: string): string => keys.byChain[chainId] ?? keys.default;
+
+export async function handle(method: string, path: string, body: string, keys: VerifierKeys): Promise<HttpResult> {
   if (method === "OPTIONS") return { status: 204, body: "" };
   if (method === "GET" && (path === "/" || path === "/key")) {
-    return { status: 200, body: JSON.stringify({ verifier: await verifierPublicKey(secretKey) }) };
+    const verifiers: Record<string, string> = { default: await verifierPublicKey(keys.default) };
+    for (const [chain, key] of Object.entries(keys.byChain)) verifiers[chain] = await verifierPublicKey(key);
+    return { status: 200, body: JSON.stringify({ verifier: verifiers.default, verifiers }) };
   }
   if (method !== "POST" || path !== "/attest") return { status: 404, body: JSON.stringify({ error: "not found" }) };
   if (body.length > MAX_BODY_BYTES) return { status: 413, body: JSON.stringify({ error: "request too large" }) };
   let req: AttestRequest;
   try { req = JSON.parse(body) as AttestRequest; } catch { return { status: 400, body: JSON.stringify({ error: "bad JSON" }) }; }
   try {
-    return { status: 200, body: JSON.stringify(await attest(secretKey, req)) };
+    return { status: 200, body: JSON.stringify(await attest(keyFor(keys, req.chainId), req)) };
   } catch (e) {
     if (e instanceof ClaimError) return { status: 422, body: JSON.stringify({ error: e.message }) };
     console.error(e);
@@ -32,8 +42,15 @@ export async function handle(method: string, path: string, body: string, secretK
   }
 }
 
-export function secretKeyFromEnv(): string {
-  const key = process.env.VERIFIER_SECRET_KEY;
-  if (!key || !/^edsk[1-9A-HJ-NP-Za-km-z]{50,98}$/.test(key)) throw new Error("set VERIFIER_SECRET_KEY to the verifier's edsk (node verifier/keygen.ts makes one)");
-  return key;
+const SECRET_KEY = /^(edsk|mdsk)[1-9A-HJ-NP-Za-km-z]{50,6000}$/;
+
+export function keysFromEnv(env: NodeJS.ProcessEnv = process.env): VerifierKeys {
+  const key = env.VERIFIER_SECRET_KEY;
+  if (!key || !SECRET_KEY.test(key)) throw new Error("set VERIFIER_SECRET_KEY to the verifier secret key, edsk… (node verifier/keygen.ts makes one)");
+  const byChain: Record<string, string> = {};
+  for (const [name, value] of Object.entries(env)) {
+    const m = /^VERIFIER_SECRET_KEY_(Net[1-9A-HJ-NP-Za-km-z]{12})$/.exec(name);
+    if (m && value && SECRET_KEY.test(value)) byChain[m[1]!] = value;
+  }
+  return { default: key, byChain };
 }

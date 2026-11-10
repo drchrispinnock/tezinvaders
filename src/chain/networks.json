@@ -32,7 +32,7 @@
     {
       "name": "quantumnet", "chain": "quantumnet", "layer": "l1", "label": "Quantumnet", "path": "/quantumnet",
       "connectType": "custom",
-      "chainId": "NetXhb8apwTcVhJ", "rpcUrl": "https://quantumnet.pqpark.dal.nomadic-labs.com/rpc", "contractAddress": "",
+      "chainId": "NetXhb8apwTcVhJ", "rpcUrl": "https://quantumnet.pqpark.dal.nomadic-labs.com/rpc", "contractAddress": "KT1W6ohdSBwD9bY51L5PZQCX5cTRXcrRpxBx",
       "tzktApi": "https://quantumnet-tzkt.pqpark.dal.nomadic-labs.com", "explorer": "https://quantumnet-tzkt.pqpark.dal.nomadic-labs.com",
       "faucet": "https://quantumnet-faucet.pqpark.dal.nomadic-labs.com"
     }

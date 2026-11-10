@@ -20,7 +20,8 @@ npm test                    # vitest, all tests (src/**/*.test.ts)
 npx vitest run src/game/sim.test.ts -t "reverses"   # single test by file and name pattern
 npm run contract:test       # contract/scripts/test-mockup.sh: originate + exercise the contract on an octez-client mockup chain
 npm run contract:deploy     # ADMIN=<alias> VERIFIER=edpk… [ENDPOINT=…] [WAIT=none on Tezos X] [FEE_MUTEZ=…] [ROUND_LENGTH=<s>, default 86400]
-npm run contract:deploy-network -- <name>   # originate on one networks.json entry (funding check, waits for TzKT, writes the KT1 back)
+npm run contract:deploy-network -- <name>   # originate on one networks.json entry via octez.js (funding check; writes the KT1 back)
+node contract/scripts/originate.ts --rpc <url> --verifier <pk>   # the origination itself, protocol-agnostic (octez-client only lends the admin key)
 node contract/scripts/storage.ts --admin tz1… --verifier edpk…   # print the initial storage literal (used by both scripts)
 npm run verifier:keygen     # a verifier key pair; the edpk goes to the contract, the edsk to the verifier's environment
 VERIFIER_SECRET_KEY=edsk… npm run verifier   # the score verifier on http://localhost:8787 (VITE_VERIFIER_URL in .env)
@@ -49,7 +50,14 @@ michelson.etherlink.<chain>.octez.io). The URL picks the network: `/shadownet`,
 and the wallet identifies the network by `rpcUrl`, as Quantumnet does, whose RPC must then match
 the wallet's own entry for it; `faucet` is optional and shown in the panel) and `npm run contract:deploy-network -- <name>`, which refuses to run until the admin
 holds tez there, originates, waits for the network's TzKT to index the KT1 and writes it into
-the JSON; then redeploy the site. `layerSwitch` in the JSON hides the L1 / L2 toggle everywhere
+the JSON; then redeploy the site. It originates through `contract/scripts/originate.ts` (octez.js with
+the admin's unencrypted key read from octez-client's wallet file), because octez-client cannot
+talk to a protocol it was not built with: Quantumnet runs Alpha. michel-codec only parses a
+top-level `Pair …` literal when parenthesised, hence `(${init})` there. Quantumnet also
+enforces `quantum_resistance_enable`: an ed25519 `key` is ill-typed data, so its contract holds
+an ML-DSA-44 `mdpk` (octez-client alias `tezinvaders-verifier-pq`, `gen keys -s mldsa44`) and
+the verifier signs for that chain with `VERIFIER_SECRET_KEY_<chainId>` (`keysFromEnv` in
+`verifier/http.ts`; octez.js-signer handles `mdsk`/`mdsig`). `layerSwitch` in the JSON hides the L1 / L2 toggle everywhere
 when false; a chain with no L2 entry never shows it (Ushuaianet has no Etherlink). `.env` may override
 a contract address (`VITE_CONTRACT_ADDRESS_<NAME>`) for local work and holds the verifier URL. Deploying there: fund the
 admin by bridging from L1 (see README), originate with `ENDPOINT=<L2 rpc>`; octez-client hangs
@@ -243,7 +251,9 @@ and `deploy/verifier-deploy.sh` create and update it), `verifier/keygen.ts` make
 and `verifier/sign.ts` signs arbitrary claims for the mockup tests, which run the real signing
 code so the packing is checked against the chain. Node runs the verifier directly; the
 octez.js packages are CommonJS to it, hence the default-import-and-destructure style there.
-The verifier's secret lives only in its environment (and the admin's ignored `.env`).
+The verifier's secrets live only in its environment (and the admin's ignored `.env`): the
+shared edsk, plus `VERIFIER_SECRET_KEY_<chainId>` for chains with their own key (Quantumnet's
+ML-DSA-44 one). `GET /key` lists them all.
 
 ## Known prototype limitations
 
