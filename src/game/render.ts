@@ -12,6 +12,8 @@ const LIFE_SCALE = 1.5;
 const FADE_END = 0.3; // crawl lines vanish once they shrink to this scale
 
 export class Renderer {
+  /** On Tezos X (L2) the ꜩ marks get a small X beside them. */
+  layer2 = false;
   private readonly ctx: CanvasRenderingContext2D;
   private dpr = 1;
 
@@ -124,8 +126,9 @@ export class Renderer {
       const markH = 13;
       ctx.textAlign = "right";
       ctx.fillStyle = "#ffd34d";
-      ctx.fillText("STAKED", WIDTH - 12 - logoWidth(markH) - 6, HEIGHT - 10);
-      drawLogo(ctx, WIDTH - 12 - logoWidth(markH), HEIGHT - 10 - markH + 1, markH, "#ffd34d");
+      const xW = this.layer2 ? 9 : 0;
+      ctx.fillText("STAKED", WIDTH - 12 - xW - logoWidth(markH) - 6, HEIGHT - 10);
+      this.drawMark(WIDTH - 12 - xW - logoWidth(markH), HEIGHT - 10 - markH + 1, markH, "#ffd34d");
     }
   }
 
@@ -223,10 +226,24 @@ export class Renderer {
     return lines;
   }
 
+  /** The ꜩ mark, with an X at its shoulder when playing on Tezos X. */
+  private drawMark(x: number, y: number, h: number, color?: string): void {
+    drawLogo(this.ctx, x, y, h, color);
+    if (!this.layer2) return;
+    const ctx = this.ctx;
+    ctx.save();
+    ctx.font = `${Math.round(h * 0.42)}px ${FONT}`;
+    ctx.textAlign = "left";
+    ctx.textBaseline = "alphabetic";
+    ctx.fillStyle = "#ffd34d";
+    ctx.fillText("X", x + logoWidth(h) + h * 0.06, y + h * 0.4);
+    ctx.restore();
+  }
+
   private drawTitle(): void {
     const ctx = this.ctx;
     const markH = 84;
-    drawLogo(ctx, (WIDTH - logoWidth(markH)) / 2, 48, markH);
+    this.drawMark((WIDTH - logoWidth(markH)) / 2, 48, markH);
 
     ctx.textAlign = "center";
     ctx.fillStyle = SHIP_COLOR;

@@ -14,7 +14,7 @@ export const aliasOf = (address: string): string | undefined => cache.get(addres
 /** Fetch aliases for any of `addresses` not already cached; resolves to true when something new was learned. */
 export async function resolveAliases(addresses: Iterable<string>, fetchFn: typeof fetch = fetch): Promise<boolean> {
   const wanted = [...new Set(addresses)].filter((a) => !cache.has(a));
-  if (wanted.length === 0) return false;
+  if (wanted.length === 0 || !config.tzktApi) return false;
   let learned = false;
   for (let i = 0; i < wanted.length; i += 100) {
     const chunk = wanted.slice(i, i + 100);

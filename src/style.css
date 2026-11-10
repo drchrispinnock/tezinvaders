@@ -20,12 +20,18 @@ canvas:focus { border-color: var(--tez); }
 .panel { width: 340px; max-width: 100%; background: var(--panel); border: 2px solid var(--line); padding: 16px; display: flex; flex-direction: column; gap: 16px; font-size: 13px; }
 .panel h1 { font-family: "Press Start 2P", ui-monospace, monospace; font-size: 14px; color: var(--tez); margin: 0; letter-spacing: 1px; display: flex; align-items: center; gap: 10px; }
 .panel h1 .logo { width: 18px; height: 24px; }
+.panel h1 .x { font-size: 9px; color: var(--gold); margin-left: -8px; align-self: flex-start; line-height: 1; }
+.panel .segs { display: flex; gap: 6px; }
 .panel h2 { font-size: 11px; text-transform: uppercase; letter-spacing: 2px; color: var(--muted); margin: 0 0 8px; }
 .panel .row > h2 { margin: 0; }
 .panel .seg { display: inline-flex; border: 1px solid var(--line); border-radius: 3px; overflow: hidden; }
 .panel .seg button { background: transparent; color: var(--muted); border: 0; border-radius: 0; padding: 4px 10px; font-size: 11px; letter-spacing: 1px; text-transform: uppercase; }
 .panel .seg button + button { border-left: 1px solid var(--line); }
 .panel .seg button.on { background: var(--tez); color: #fff; }
+body.l2 canvas, body.l2 .panel { border-color: #6b5a1f; }
+body.l2 canvas:focus { border-color: var(--gold); }
+body.l2 .panel .seg button.on { background: var(--gold); color: #111; }
+body.l2 .panel h1 { color: var(--gold); }
 .panel section { border-top: 1px solid var(--line); padding-top: 12px; }
 .panel button { font: inherit; background: var(--tez); color: #fff; border: 0; padding: 8px 12px; cursor: pointer; border-radius: 3px; }
 .panel button.secondary { background: transparent; border: 1px solid var(--line); color: var(--text); }

@@ -16,6 +16,8 @@ export class Game {
   private paused = false;
   hiScore = 0;
   staked = false;
+  /** Playing on Tezos X: the renderer marks the ꜩ with an X. */
+  set layer2(on: boolean) { this.renderer.layer2 = on; }
 
   constructor(canvas: HTMLCanvasElement, private readonly onEvent: (e: GameEvent) => void) {
     this.renderer = new Renderer(canvas);

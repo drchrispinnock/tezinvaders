@@ -27,11 +27,11 @@ export interface Badge {
 }
 
 export const BADGES: readonly Badge[] = [
-  { id: 0, slug: "dollar", name: "Dollar Invader", symbol: "TZIUSD", threshold: 1000, bitmap: KINDS.dollar.frames[0], color: KINDS.dollar.color, shade: KINDS.dollar.color },
-  { id: 1, slug: "euro", name: "Euro Invader", symbol: "TZIEUR", threshold: 3000, bitmap: KINDS.euro.frames[0], color: KINDS.euro.color, shade: KINDS.euro.color },
-  { id: 2, slug: "pound", name: "Pound Invader", symbol: "TZIGBP", threshold: 5000, bitmap: KINDS.pound.frames[0], color: KINDS.pound.color, shade: KINDS.pound.color },
-  { id: 3, slug: "yen", name: "Yen Invader", symbol: "TZIJPY", threshold: 8000, bitmap: KINDS.yen.frames[0], color: KINDS.yen.color, shade: KINDS.yen.color },
-  { id: 4, slug: "mothership", name: "Mothership", symbol: "TZISHIP", threshold: 12000, bitmap: BANK, color: BANK_COLOR, shade: BANK_SHADE },
+  { id: 0, slug: "dollar", name: "Dollar TezInvader", symbol: "TZIUSD", threshold: 1000, bitmap: KINDS.dollar.frames[0], color: KINDS.dollar.color, shade: KINDS.dollar.color },
+  { id: 1, slug: "euro", name: "Euro TezInvader", symbol: "TZIEUR", threshold: 3000, bitmap: KINDS.euro.frames[0], color: KINDS.euro.color, shade: KINDS.euro.color },
+  { id: 2, slug: "pound", name: "Pound TezInvader", symbol: "TZIGBP", threshold: 5000, bitmap: KINDS.pound.frames[0], color: KINDS.pound.color, shade: KINDS.pound.color },
+  { id: 3, slug: "yen", name: "Yen TezInvader", symbol: "TZIJPY", threshold: 8000, bitmap: KINDS.yen.frames[0], color: KINDS.yen.color, shade: KINDS.yen.color },
+  { id: 4, slug: "mothership", name: "TezInvaders Mothership", symbol: "TZISHIP", threshold: 12000, bitmap: BANK, color: BANK_COLOR, shade: BANK_SHADE },
 ];
 
 export const badgeDescription = (b: Badge): string =>

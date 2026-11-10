@@ -46,9 +46,11 @@ Build-time config lives in the committed `.env.production`. Two ready-made targe
 The badge token metadata on chain names the image URL, so after choosing a host repoint the
 five tokens with `set_token_metadata` (see `CLAUDE.md`).
 
-The panel has a Shadownet / Mainnet toggle; Shadownet is the default. Each network has its own
-contract address in `.env` (`VITE_CONTRACT_ADDRESS_MAINNET` for Mainnet, deployed with
-`ENDPOINT=https://rpc.tzkt.io/mainnet`).
+The panel has a Shadownet / Mainnet toggle and an L1 / L2 toggle; Shadownet L1 is the default.
+L2 is Tezos X, the Etherlink rollup's Michelson interface, which runs the same contract. Each
+combination has its own contract address in `.env` (`VITE_CONTRACT_ADDRESS_MAINNET`,
+`VITE_CONTRACT_ADDRESS_TEZOSX_SHADOWNET`, …), deployed with the matching `ENDPOINT=` (for
+example `https://rpc.tzkt.io/mainnet` or `https://michelson.etherlink.shadownet.octez.io`).
 
 ## Layout
 

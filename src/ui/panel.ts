@@ -1,5 +1,5 @@
 import { BADGES, badgeDataUri, badgeFor } from "../chain/badges";
-import { NETWORKS, config, formatTez, hasContract, isNetworkName, shortAddress, type NetworkName } from "../chain/config";
+import { CHAINS, LAYERS, config, formatTez, hasContract, isChain, isLayer, networkFor, shortAddress, type NetworkName } from "../chain/config";
 import { roundOver, type GameStorage, type PlayerBadges } from "../chain/contract";
 import { aliasOf } from "../chain/tzkt";
 import FAKE_LEADERBOARD from "../data/leaderboard.json";
@@ -35,7 +35,7 @@ export const displayName = (address: string): string => aliasOf(address) ?? shor
 
 /** The name as a link to the account on the network's TzKT explorer, opening in a new tab. */
 const explorerLink = (address: string, text = displayName(address)): string =>
-  `<a href="${config.explorer}/${address}" target="_blank" rel="noopener" title="${address} on TzKT">${text}</a>`;
+  !config.explorer ? `<span title="${address}">${text}</span>` : `<a href="${config.explorer}/${address}" target="_blank" rel="noopener" title="${address} on TzKT">${text}</a>`;
 
 /** "3d 4h", "2h 15m", "40m", "<1m" */
 export function formatDuration(ms: number): string {
@@ -60,11 +60,12 @@ export class Panel {
       if (field) this.drafts[field] = (e.target as HTMLInputElement).value;
     });
     root.addEventListener("click", (e) => {
-      const btn = (e.target as HTMLElement).closest<HTMLButtonElement>("button[data-action], button[data-network]");
+      const btn = (e.target as HTMLElement).closest<HTMLButtonElement>("button[data-action], button[data-chain], button[data-layer]");
       if (!btn || btn.disabled) return;
-      const network = btn.dataset.network;
-      if (network !== undefined) {
-        if (isNetworkName(network) && network !== config.network) this.actions.switchNetwork(network);
+      const { chain, layer } = btn.dataset;
+      if (chain !== undefined || layer !== undefined) {
+        const target = networkFor(isChain(chain) ? chain : config.chain, isLayer(layer) ? layer : config.layer);
+        if (target !== config.network) this.actions.switchNetwork(target);
         return;
       }
       const action = btn.dataset.action as Exclude<keyof PanelActions, "switchNetwork">;
@@ -85,8 +86,11 @@ export class Panel {
     const over = s.storage ? roundOver(s.storage) : false;
     const dis = s.busy ? "disabled" : "";
 
-    const networkHtml = `<div class="seg" role="group" aria-label="Network">${Object.values(NETWORKS).map((n) =>
-      `<button data-network="${n.name}" class="${n.name === config.network ? "on" : ""}" ${dis} aria-pressed="${n.name === config.network}">${n.label}</button>`).join("")}</div>`;
+    const networkHtml = `<div class="segs">
+      <div class="seg" role="group" aria-label="Network">${CHAINS.map((c) =>
+        `<button data-chain="${c.name}" class="${c.name === config.chain ? "on" : ""}" ${dis} aria-pressed="${c.name === config.chain}">${c.label}</button>`).join("")}</div>
+      <div class="seg" role="group" aria-label="Layer">${LAYERS.map((l) =>
+        `<button data-layer="${l.name}" class="${l.name === config.layer ? "on" : ""}" ${dis} aria-pressed="${l.name === config.layer}" title="${l.title}">${l.label}</button>`).join("")}</div></div>`;
 
     const walletHtml = me
       ? `<div class="row"><span class="addr">${explorerLink(me)}</span>
@@ -97,7 +101,7 @@ export class Panel {
     let poolHtml: string;
     if (!hasContract()) {
       poolHtml = `<p class="muted">No contract configured on ${config.label}. Free play only.<br>
-        Deploy <code>contract/tezinvaders.tz</code> and set <code>VITE_CONTRACT_ADDRESS_${config.network.toUpperCase()}</code>.</p>`;
+        Deploy <code>contract/tezinvaders.tz</code> and set <code>VITE_CONTRACT_ADDRESS_${config.envSuffix}</code>.</p>`;
     } else if (!s.storage) {
       poolHtml = `<p class="muted">Loading ${shortAddress(config.contractAddress)}…</p>`;
     } else {
@@ -131,19 +135,19 @@ export class Panel {
 
     const badgesHtml = hasContract() ? this.badges(s, me) : "";
 
-    // One table: the round's on-chain scores ranked first, then the stand-in entries (src/data/leaderboard.json),
+    // One table: the round's on-chain scores and the stand-in entries ranked together (src/data/leaderboard.json),
     // the latter dimmed and dropped once the same address holds a real ticket.
     const real = (s.storage?.scores ?? []).map((e) => ({ address: e.address, name: displayName(e.address), score: e.score, standIn: false }));
     const taken = new Set(real.map((e) => e.address));
     const standIns = (FAKE_LEADERBOARD as FakeEntry[]).filter((e) => !e.address || !taken.has(e.address)).map((e) => ({ ...e, standIn: true }));
     const byScore = (a: { score: number }, b: { score: number }) => b.score - a.score;
-    const rows = [...real.sort(byScore), ...standIns.sort(byScore)].slice(0, 10).map((e, i) =>
+    const rows = [...real, ...standIns].sort(byScore).slice(0, 10).map((e, i) =>
       `<tr class="${e.address === me ? "me" : ""} ${e.standIn ? "stand-in" : ""}"><td>${i + 1}.</td><td>${e.address ? explorerLink(e.address, e.name) : e.name}</td><td>${e.score}</td></tr>`).join("");
     const champs = (s.storage?.champions ?? []).slice(0, 10).map((c) =>
       `<tr class="${c.player === me ? "me" : ""}"><td>R${c.round}</td><td>${explorerLink(c.player)}</td><td>${c.score}</td></tr>`).join("");
 
     this.root.innerHTML = `
-      <h1><img class="logo" src="${import.meta.env.BASE_URL}tezos.svg" alt="" width="18" height="24" /> TEZINVADERS</h1>
+      <h1><img class="logo" src="${import.meta.env.BASE_URL}tezos.svg" alt="" width="18" height="24" />${config.layer === "l2" ? `<sup class="x" title="Tezos X">X</sup>` : ""} TEZINVADERS</h1>
       <section><div class="row"><h2>Wallet</h2>${networkHtml}</div>${walletHtml}</section>
       <section><h2>Prize pool</h2>${poolHtml}</section>
       ${badgesHtml}

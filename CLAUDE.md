@@ -35,9 +35,12 @@ mockup chain's `NOW` is stuck at the epoch, so deadline tests originate with exp
 `--round-ends` values.
 
 Runtime config comes from `.env` (see `.env.example`): per network, `VITE_RPC_URL_<NET>` and
-`VITE_CONTRACT_ADDRESS_<NET>` for `SHADOWNET` and `MAINNET`. `.env.production` is committed
+`VITE_CONTRACT_ADDRESS_<NET>` for `SHADOWNET`, `MAINNET`, `TEZOSX_SHADOWNET` and
+`TEZOSX_MAINNET` (the last two are Tezos X, the Etherlink rollup's Michelson interface: same
+contracts, same tz keys, RPCs at michelson.etherlink.<chain>.octez.io). `.env.production` is committed
 (the values are public) and is what `vite build` and the Pages workflow use. The panel has a Shadownet / Mainnet
-toggle, Shadownet by default, persisted in `localStorage`; switching disconnects the wallet and
+toggle and an L1 / L2 toggle (a `Chain` and a `Layer`, combined by `networkFor()` into one of
+the four `NetworkName`s), Shadownet L1 by default, persisted in `localStorage`; switching disconnects the wallet and
 reloads the page because the Octez Connect client and toolkit are bound to one network. (Ghostnet no
 longer exists.) With no valid KT1 address for the active network the panel says so and the game
 is free play only.
@@ -137,8 +140,7 @@ wallet row go through `explorerLink()`: the TzKT alias when there is one, else t
 address, as a link to the account on the network's TzKT explorer (`explorer` in
 `config.ts`) opening in a new tab, with the full address in the tooltip. The leaderboard merges the round's on-chain scores with the
 stand-in entries in `src/data/leaderboard.json` (`[{ "address"?, "name", "score" }]`,
-converted from `InitialLeaderboard.md` beside it) into one table, real scores ranked first then the
-stand-ins; stand-in rows are dimmed (`tr.stand-in`) and a stand-in is dropped once its address holds a real
+converted from `InitialLeaderboard.md` beside it) into one table ranked by score; stand-in rows are dimmed (`tr.stand-in`) and a stand-in is dropped once its address holds a real
 ticket. Edit that file to change the list (`resolveJsonModule` is on for the import). Inputs carry `data-field` and their
 typed values survive re-renders in `Panel.drafts` (the admin's round-length box). The round
 deadline is shown as "ends in …" and refreshes with the 20 s storage poll; once passed, Buy

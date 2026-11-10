@@ -1,5 +1,5 @@
 import "./polyfills";
-import { hasContract, setNetwork } from "./chain/config";
+import { config, hasContract, setNetwork } from "./chain/config";
 import { buyTicket, endRound, readBadges, readStorage, setRoundLength, submitScore, type GameStorage } from "./chain/contract";
 import { BADGES } from "./chain/badges";
 import { resolveAliases } from "./chain/tzkt";
@@ -20,6 +20,12 @@ const game = new Game(canvas, (e) => {
   if (e.type === "gameover") state.pendingScore = e.score;
   if (e.type === "gameover" || e.type === "start") refreshPanel();
 });
+
+// Tezos X (L2) look: an X beside every ꜩ, a gold trim and its own favicon.
+const onL2 = config.layer === "l2";
+game.layer2 = onL2;
+document.body.classList.toggle("l2", onL2);
+if (onL2) document.querySelector<HTMLLinkElement>("link[rel=icon]")?.setAttribute("href", `${import.meta.env.BASE_URL}tezos-x.svg`);
 
 function refreshPanel(): void {
   const me = state.address;

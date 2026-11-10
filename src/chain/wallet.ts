@@ -6,6 +6,8 @@ import { config, type NetworkName } from "./config";
 const NETWORK_TYPES: Record<NetworkName, NetworkType> = {
   shadownet: NetworkType.SHADOWNET,
   mainnet: NetworkType.MAINNET,
+  "tezosx-shadownet": NetworkType.TEZOSX_SHADOWNET,
+  "tezosx-mainnet": NetworkType.TEZOSX_MAINNET,
 };
 
 /**
