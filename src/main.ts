@@ -2,6 +2,7 @@ import "./polyfills";
 import { hasContract, setNetwork } from "./chain/config";
 import { buyTicket, endRound, readBadges, readStorage, setRoundLength, submitScore, type GameStorage } from "./chain/contract";
 import { BADGES } from "./chain/badges";
+import { resolveAliases } from "./chain/tzkt";
 import { Wallet } from "./chain/wallet";
 import { Game } from "./game/Game";
 import { Panel, type PanelState } from "./ui/panel";
@@ -73,7 +74,16 @@ async function loadStorage(): Promise<GameStorage | null> {
     setStatus(`Could not read contract: ${describe(err)}`, true);
   }
   refreshPanel();
+  void nameAddresses();
   return state.storage;
+}
+
+/** Look up TzKT aliases for everyone on the boards (and the player), re-rendering if any are new. */
+async function nameAddresses(): Promise<void> {
+  const s = state.storage;
+  const addresses = [...(s?.scores ?? []).map((e) => e.address), ...(s?.champions ?? []).map((c) => c.player)];
+  if (state.address) addresses.push(state.address);
+  if (await resolveAliases(addresses)) refreshPanel();
 }
 
 const panel = new Panel(panelRoot, {

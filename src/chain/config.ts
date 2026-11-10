@@ -9,6 +9,8 @@ export interface Network {
   readonly label: string;
   readonly rpcUrl: string;
   readonly contractAddress: string;
+  /** TzKT API root for this network, used for account aliases on the leaderboards. */
+  readonly tzktApi: string;
 }
 
 const env = import.meta.env;
@@ -19,12 +21,14 @@ export const NETWORKS: Readonly<Record<NetworkName, Network>> = {
     label: "Shadownet",
     rpcUrl: env.VITE_RPC_URL_SHADOWNET ?? "https://rpc.shadownet.teztnets.com",
     contractAddress: env.VITE_CONTRACT_ADDRESS_SHADOWNET ?? "",
+    tzktApi: "https://api.shadownet.tzkt.io",
   },
   mainnet: {
     name: "mainnet",
     label: "Mainnet",
     rpcUrl: env.VITE_RPC_URL_MAINNET ?? "https://rpc.tzkt.io/mainnet",
     contractAddress: env.VITE_CONTRACT_ADDRESS_MAINNET ?? "",
+    tzktApi: "https://api.tzkt.io",
   },
 };
 
@@ -55,6 +59,7 @@ export const config = {
   get label(): string { return NETWORKS[currentNetwork()].label; },
   get rpcUrl(): string { return NETWORKS[currentNetwork()].rpcUrl; },
   get contractAddress(): string { return NETWORKS[currentNetwork()].contractAddress; },
+  get tzktApi(): string { return NETWORKS[currentNetwork()].tzktApi; },
 };
 
 export const hasContract = (): boolean => /^KT1[1-9A-HJ-NP-Za-km-z]{33}$/.test(config.contractAddress);

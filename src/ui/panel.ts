@@ -1,6 +1,11 @@
 import { BADGES, badgeDataUri, badgeFor } from "../chain/badges";
 import { NETWORKS, config, formatTez, hasContract, isNetworkName, shortAddress, type NetworkName } from "../chain/config";
 import { roundOver, type GameStorage, type PlayerBadges } from "../chain/contract";
+import { aliasOf } from "../chain/tzkt";
+import FAKE_LEADERBOARD from "../data/leaderboard.json";
+
+/** A row of the stand-in leaderboard shown while the round has no on-chain scores (src/data/leaderboard.json). */
+interface FakeEntry { name: string; score: number }
 
 export interface PanelState {
   address: string | null;
@@ -24,6 +29,9 @@ export interface PanelActions {
   setRoundLength(hours: number): void;
   switchNetwork(name: NetworkName): void;
 }
+
+/** The TzKT alias when the account has one, otherwise the shortened address. */
+export const displayName = (address: string): string => aliasOf(address) ?? shortAddress(address);
 
 /** "3d 4h", "2h 15m", "40m", "<1m" */
 export function formatDuration(ms: number): string {
@@ -77,7 +85,7 @@ export class Panel {
       `<button data-network="${n.name}" class="${n.name === config.network ? "on" : ""}" ${dis} aria-pressed="${n.name === config.network}">${n.label}</button>`).join("")}</div>`;
 
     const walletHtml = me
-      ? `<div class="row"><span class="addr" title="${me}">${shortAddress(me)}</span>
+      ? `<div class="row"><span class="addr" title="${me}">${displayName(me)}</span>
            <button class="secondary" data-action="disconnect" ${dis}>Disconnect</button></div>`
       : `<div class="row"><span class="muted">Not connected</span>
            <button data-action="connect" ${dis}>Connect wallet</button></div>`;
@@ -120,9 +128,11 @@ export class Panel {
     const badgesHtml = hasContract() ? this.badges(s, me) : "";
 
     const rows = (s.storage?.scores ?? []).slice(0, 10).map((e, i) =>
-      `<tr class="${e.address === me ? "me" : ""}"><td>${i + 1}.</td><td title="${e.address}">${shortAddress(e.address)}</td><td>${e.score}</td></tr>`).join("");
+      `<tr class="${e.address === me ? "me" : ""}"><td>${i + 1}.</td><td title="${e.address}">${displayName(e.address)}</td><td>${e.score}</td></tr>`).join("");
+    const fakeRows = [...(FAKE_LEADERBOARD as FakeEntry[])].sort((a, b) => b.score - a.score).slice(0, 10).map((e, i) =>
+      `<tr><td>${i + 1}.</td><td>${e.name}</td><td>${e.score}</td></tr>`).join("");
     const champs = (s.storage?.champions ?? []).slice(0, 10).map((c) =>
-      `<tr class="${c.player === me ? "me" : ""}"><td>R${c.round}</td><td title="${c.player}">${shortAddress(c.player)}</td><td>${c.score}</td></tr>`).join("");
+      `<tr class="${c.player === me ? "me" : ""}"><td>R${c.round}</td><td title="${c.player}">${displayName(c.player)}</td><td>${c.score}</td></tr>`).join("");
 
     this.root.innerHTML = `
       <h1><img class="logo" src="${import.meta.env.BASE_URL}tezos.svg" alt="" width="18" height="24" /> TEZINVADERS</h1>
@@ -130,7 +140,7 @@ export class Panel {
       <section><h2>Prize pool</h2>${poolHtml}</section>
       ${badgesHtml}
       <section><h2>Leaderboard · this round</h2>
-        ${rows ? `<table>${rows}</table>` : `<p class="muted">No scores yet.</p>`}</section>
+        ${rows ? `<table>${rows}</table>` : fakeRows ? `<table>${fakeRows}</table><p class="muted">No scores on-chain yet.</p>` : `<p class="muted">No scores yet.</p>`}</section>
       <section><h2>Hall of fame</h2>
         ${champs ? `<table>${champs}</table>` : `<p class="muted">No rounds finished yet.</p>`}</section>
       <section><div class="status ${s.error ? "error" : ""}">${s.status}</div></section>`;

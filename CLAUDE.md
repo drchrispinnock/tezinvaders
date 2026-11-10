@@ -115,6 +115,10 @@ which are per-cell bitmaps eroded by `eraseBlob`.
   `buyTicket`, `submitScore`, `endRound`, `setRoundLength` wrap the entrypoints via
   `methodsObject` and wait for 1 confirmation. Unit entrypoints must be called with
   `UnitValue` (from `@tezos-x/octez.js`).
+- `tzkt.ts` — `resolveAliases()` fetches TzKT account aliases in batches from the active
+  network's TzKT API (`tzktApi` in `config.ts`: api.shadownet.tzkt.io / api.tzkt.io) into a
+  page-lifetime cache; `aliasOf()` reads it. `main.ts` calls it after every storage load for
+  everyone on the boards plus the player, and re-renders when a new alias arrives.
 - `badges.ts` — the five badges (id, slug, name, threshold, sprite) and `badgeSvg()` /
   `badgeDataUri()`, which render the game's own bitmaps to SVG. The panel draws those data
   URIs locally, so it needs no token-metadata reads. The on-chain token metadata instead
@@ -128,7 +132,12 @@ which are per-cell bitmaps eroded by `eraseBlob`.
 ### UI: `src/ui/panel.ts` and `src/main.ts`
 
 `Panel.render(state)` rebuilds the side panel's innerHTML from a `PanelState`; buttons carry
-`data-action` names that map 1:1 onto `PanelActions`. Inputs carry `data-field` and their
+`data-action` names that map 1:1 onto `PanelActions`. Addresses on the boards and in the
+wallet row go through `displayName()`: the TzKT alias when there is one, else the short
+address (the full address stays in the `title` tooltip). While the current round has no
+on-chain scores the leaderboard shows the stand-in list in `src/data/leaderboard.json`
+(`[{ "name", "score" }]`, sorted by score, captioned "No scores on-chain yet"); edit that
+file to change it (`resolveJsonModule` is on for the import). Inputs carry `data-field` and their
 typed values survive re-renders in `Panel.drafts` (the admin's round-length box). The round
 deadline is shown as "ends in …" and refreshes with the 20 s storage poll; once passed, Buy
 ticket and Submit score are disabled and everyone sees the End round button. `main.ts` owns the single `PanelState`,
