@@ -171,7 +171,8 @@ which are per-cell bitmaps eroded by `eraseBlob`.
 `Panel.render(state)` rebuilds the side panel's innerHTML from a `PanelState`; buttons carry
 `data-action` names that map 1:1 onto `PanelActions`. Addresses on the boards and in the
 wallet row go through `explorerLink()`: the TzKT alias when there is one, else the short
-address, as a link to the account on the network's TzKT explorer (`explorer` in
+address, with the account's TzKT avatar (services.tzkt.io/v1/avatars, logo or identicon) on the
+boards, as a link to the account on the network's TzKT explorer (`explorer` in
 `config.ts`) opening in a new tab, with the full address in the tooltip. The leaderboard merges the round's on-chain scores with the
 stand-in entries in `src/data/leaderboard.json` (`[{ "address"?, "name", "score" }]`,
 converted from `InitialLeaderboard.md` beside it) into one table ranked by score; stand-in rows are dimmed (`tr.stand-in`) and a stand-in is dropped once its address holds a real

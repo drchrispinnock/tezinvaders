@@ -49,6 +49,10 @@ export const displayName = (address: string): string => aliasOf(address) ?? shor
 const explorerLink = (address: string, text = displayName(address)): string =>
   !config.explorer ? `<span title="${address}">${text}</span>` : `<a href="${config.explorer}/${address}" target="_blank" rel="noopener" title="${address} on TzKT">${text}</a>`;
 
+/** TzKT's picture for an account (its logo when it has one, else a generated identicon), the same service for every network. */
+const avatar = (address: string): string =>
+  `<img class="avatar" src="https://services.tzkt.io/v1/avatars/${address}" alt="" width="18" height="18" loading="lazy">`;
+
 /** "3d 4h", "2h 15m", "40m", "<1m" */
 export function formatDuration(ms: number): string {
   const minutes = Math.floor(ms / 60_000);
@@ -169,9 +173,9 @@ export class Panel {
     const standIns = (FAKE_LEADERBOARD as FakeEntry[]).filter((e) => !e.address || !taken.has(e.address)).map((e) => ({ ...e, standIn: true }));
     const byScore = (a: { score: number }, b: { score: number }) => b.score - a.score;
     const rows = [...real, ...standIns].sort(byScore).slice(0, 10).map((e, i) =>
-      `<tr class="${e.address === me ? "me" : ""} ${e.standIn ? "stand-in" : ""}"><td>${i + 1}.</td><td>${e.address ? explorerLink(e.address, e.name) : e.name}</td><td>${e.score}</td></tr>`).join("");
+      `<tr class="${e.address === me ? "me" : ""} ${e.standIn ? "stand-in" : ""}"><td>${i + 1}.</td><td>${e.address ? avatar(e.address) + explorerLink(e.address, e.name) : e.name}</td><td>${e.score}</td></tr>`).join("");
     const champs = (s.storage?.champions ?? []).slice(0, 10).map((c) =>
-      `<tr class="${c.player === me ? "me" : ""}"><td>R${c.round}</td><td>${explorerLink(c.player)}</td><td>${c.score}</td></tr>`).join("");
+      `<tr class="${c.player === me ? "me" : ""}"><td>R${c.round}</td><td>${avatar(c.player)}${explorerLink(c.player)}</td><td>${c.score}</td></tr>`).join("");
 
     this.root.innerHTML = `
       ${s.switching ? `<div class="banner">Switching to ${s.switching}…</div>` : ""}
