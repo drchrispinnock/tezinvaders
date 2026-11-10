@@ -1,0 +1,60 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: >-
+  TezInvaders score verifier: one Lambda behind a public Function URL. It replays recorded
+  games and signs score attestations the contract checks (see verifier/). Create the stack,
+  then upload the bundle (npm run verifier:bundle; deploy/verifier-deploy.sh) and put the
+  FunctionUrl output into .env.production as VITE_VERIFIER_URL.
+Parameters:
+  VerifierSecretKey:
+    Type: String
+    NoEcho: true
+    Description: The verifier's edsk (node verifier/keygen.ts); its edpk is the contract's verifier key.
+    AllowedPattern: "^edsk[1-9A-HJ-NP-Za-km-z]{50,98}$"
+Resources:
+  Role:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal: { Service: lambda.amazonaws.com }
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+  Function:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: tezinvaders-verifier
+      Runtime: nodejs22.x
+      Handler: lambda.handler
+      Role: !GetAtt Role.Arn
+      MemorySize: 512
+      Timeout: 30
+      Environment:
+        Variables:
+          VERIFIER_SECRET_KEY: !Ref VerifierSecretKey
+      # Placeholder until deploy/verifier-deploy.sh uploads the real bundle.
+      Code:
+        ZipFile: |
+          export const handler = async () => ({ statusCode: 503, body: '{"error":"verifier not deployed yet"}' });
+  Url:
+    Type: AWS::Lambda::Url
+    Properties:
+      TargetFunctionArn: !Ref Function
+      AuthType: NONE
+      Cors:
+        AllowOrigins: ["*"]
+        AllowMethods: [POST, GET]
+        AllowHeaders: [content-type]
+  UrlPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref Function
+      Action: lambda:InvokeFunctionUrl
+      Principal: "*"
+      FunctionUrlAuthType: NONE
+Outputs:
+  FunctionUrl:
+    Value: !GetAtt Url.FunctionUrl
+    Description: Put this (without the trailing slash) into .env.production as VITE_VERIFIER_URL.

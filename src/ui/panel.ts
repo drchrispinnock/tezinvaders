@@ -1,6 +1,7 @@
 import { BADGES, badgeDataUri, badgeFor } from "../chain/badges";
 import { CHAINS, LAYERS, config, formatTez, hasContract, isChain, isLayer, networkFor, shortAddress, type NetworkName } from "../chain/config";
-import { roundOver, type GameStorage, type PlayerBadges } from "../chain/contract";
+import { roundOver, type GameStorage, type PlayerState, type ScoreEntry } from "../chain/contract";
+import type { GameRecord } from "../chain/verifier";
 import { aliasOf } from "../chain/tzkt";
 import FAKE_LEADERBOARD from "../data/leaderboard.json";
 
@@ -10,13 +11,17 @@ interface FakeEntry { address?: string; name: string; score: number }
 export interface PanelState {
   address: string | null;
   storage: GameStorage | null;
-  /** The connected player's all-time best and badges; null until loaded or when not connected. */
-  badges: PlayerBadges | null;
+  /** This round's table, highest first (from TzKT, with the on-chain leader merged in). */
+  scores: ScoreEntry[];
+  /** The connected player's ticket, all-time best and badges; null until loaded or when not connected. */
+  badges: PlayerState | null;
   busy: boolean;
   status: string;
   error: boolean;
   /** Score waiting to be submitted after a game over, if the player is eligible. */
   pendingScore: number | null;
+  /** The recorded game behind pendingScore, for the verifier. */
+  pendingGame: GameRecord | null;
 }
 
 export interface PanelActions {
@@ -80,8 +85,8 @@ export class Panel {
 
   render(s: PanelState): void {
     const me = s.address;
-    const myEntry = me && s.storage ? s.storage.scores.find((x) => x.address === me) : undefined;
-    const hasTicket = Boolean(myEntry);
+    const ticket = me ? s.badges?.ticket ?? null : null;
+    const hasTicket = ticket !== null;
     const isAdmin = Boolean(me && s.storage && s.storage.admin === me);
     const over = s.storage ? roundOver(s.storage) : false;
     const dis = s.busy ? "disabled" : "";
@@ -117,14 +122,16 @@ export class Panel {
         <div class="row"><span>Prize pool</span><span class="big">${formatTez(st.pool)}</span></div>
         <div class="row"><span>Entry fee</span><span>${formatTez(st.entryFee)}</span></div>
         <div class="row">
-          <span>${over ? `Next ticket pays out and starts round ${st.round + 1}` : hasTicket ? `Ticket held · best ${myEntry?.score ?? 0}` : "No ticket this round"}</span>
+          <span>${over ? `Next ticket pays out and starts round ${st.round + 1}` : hasTicket ? `Ticket held · best ${ticket ?? 0}` : "No ticket this round"}</span>
           <button data-action="buyTicket" ${dis} ${!me ? "disabled" : ""}>${hasTicket && !over ? "Top up pool" : "Buy ticket"}</button>
         </div>
-        ${s.pendingScore !== null && hasTicket && s.pendingScore > (myEntry?.score ?? 0)
+        ${s.pendingScore !== null && hasTicket && s.pendingScore > (ticket ?? 0)
           ? over
             ? `<div class="row"><span class="muted">New best ${s.pendingScore}, but the round is over</span></div>`
-            : `<div class="row"><span>New best: ${s.pendingScore}</span>
-                 <button class="submit" data-action="submitScore" ${dis}>Submit score on-chain</button></div>`
+            : !config.verifierUrl
+              ? `<div class="row"><span class="muted">New best ${s.pendingScore}, but no score verifier is configured</span></div>`
+              : `<div class="row"><span>New best: ${s.pendingScore}</span>
+                 <button class="submit" data-action="submitScore" ${dis} title="The verifier replays your game and signs the score">Submit score on-chain</button></div>`
           : ""}
         ${canPayOut ? `<div class="row"><span class="muted">${isAdmin ? "You are the admin" : "Deadline passed"}</span>
                <button class="secondary" data-action="endRound" ${dis}>End round &amp; pay out</button></div>` : ""}
@@ -137,7 +144,7 @@ export class Panel {
 
     // One table: the round's on-chain scores and the stand-in entries ranked together (src/data/leaderboard.json),
     // the latter dimmed and dropped once the same address holds a real ticket.
-    const real = (s.storage?.scores ?? []).map((e) => ({ address: e.address, name: displayName(e.address), score: e.score, standIn: false }));
+    const real = s.scores.map((e) => ({ address: e.address, name: displayName(e.address), score: e.score, standIn: false }));
     const taken = new Set(real.map((e) => e.address));
     const standIns = (FAKE_LEADERBOARD as FakeEntry[]).filter((e) => !e.address || !taken.has(e.address)).map((e) => ({ ...e, standIn: true }));
     const byScore = (a: { score: number }, b: { score: number }) => b.score - a.score;

@@ -15,6 +15,8 @@ export interface Network {
   readonly label: string;
   readonly rpcUrl: string;
   readonly contractAddress: string;
+  /** The chain id the verifier binds attestations to (NetX…). */
+  readonly chainId: string;
   /** TzKT API root for account aliases on the leaderboards (Etherlink TzKT covers the Michelson side too). */
   readonly tzktApi: string;
   /** TzKT block explorer root (accounts at `<root>/<address>`). */
@@ -29,6 +31,7 @@ export const NETWORKS: Readonly<Record<NetworkName, Network>> = {
     label: "Shadownet",
     rpcUrl: env.VITE_RPC_URL_SHADOWNET ?? "https://rpc.shadownet.teztnets.com",
     contractAddress: env.VITE_CONTRACT_ADDRESS_SHADOWNET ?? "",
+    chainId: "NetXsqzbfFenSTS",
     tzktApi: "https://api.shadownet.tzkt.io",
     explorer: "https://shadownet.tzkt.io",
   },
@@ -37,6 +40,7 @@ export const NETWORKS: Readonly<Record<NetworkName, Network>> = {
     label: "Mainnet",
     rpcUrl: env.VITE_RPC_URL_MAINNET ?? "https://rpc.tzkt.io/mainnet",
     contractAddress: env.VITE_CONTRACT_ADDRESS_MAINNET ?? "",
+    chainId: "NetXdQprcVkpaWU",
     tzktApi: "https://api.tzkt.io",
     explorer: "https://tzkt.io",
   },
@@ -45,6 +49,7 @@ export const NETWORKS: Readonly<Record<NetworkName, Network>> = {
     label: "Tezos X Shadownet",
     rpcUrl: env.VITE_RPC_URL_TEZOSX_SHADOWNET ?? "https://michelson.etherlink.shadownet.octez.io",
     contractAddress: env.VITE_CONTRACT_ADDRESS_TEZOSX_SHADOWNET ?? "",
+    chainId: "NetXtLrzvQDobza",
     tzktApi: "https://api.shadownet.etherlink.tzkt.io",
     explorer: "https://shadownet.etherlink.tzkt.io",
   },
@@ -53,6 +58,7 @@ export const NETWORKS: Readonly<Record<NetworkName, Network>> = {
     label: "Tezos X Mainnet",
     rpcUrl: env.VITE_RPC_URL_TEZOSX_MAINNET ?? "https://michelson.etherlink.mainnet.octez.io",
     contractAddress: env.VITE_CONTRACT_ADDRESS_TEZOSX_MAINNET ?? "",
+    chainId: "NetXohUVN5QWR4f",
     tzktApi: "https://api.etherlink.tzkt.io",
     explorer: "https://etherlink.tzkt.io",
   },
@@ -102,10 +108,13 @@ export const config = {
   get label(): string { return NETWORKS[currentNetwork()].label; },
   get rpcUrl(): string { return NETWORKS[currentNetwork()].rpcUrl; },
   get contractAddress(): string { return NETWORKS[currentNetwork()].contractAddress; },
+  get chainId(): string { return NETWORKS[currentNetwork()].chainId; },
   get tzktApi(): string { return NETWORKS[currentNetwork()].tzktApi; },
   get explorer(): string { return NETWORKS[currentNetwork()].explorer; },
   /** The `.env` variable suffix for the active network, e.g. `TEZOSX_SHADOWNET`. */
   get envSuffix(): string { return currentNetwork().toUpperCase().replace("-", "_"); },
+  /** The score verifier (verifier/server.ts or lambda.ts), one for every network; empty when none is configured. */
+  get verifierUrl(): string { return (env.VITE_VERIFIER_URL ?? "").replace(/\/$/, ""); },
 };
 
 export const hasContract = (): boolean => /^KT1[1-9A-HJ-NP-Za-km-z]{33}$/.test(config.contractAddress);

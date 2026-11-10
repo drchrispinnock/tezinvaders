@@ -2,7 +2,7 @@
 // in batches from the active network's TzKT API and cached for the page's lifetime. A lookup
 // failure just leaves the addresses unnamed; the panel falls back to the short address.
 
-import { config } from "./config";
+import { config, hasContract } from "./config";
 
 interface TzktAccount { address: string; alias: string | null }
 
@@ -31,6 +31,21 @@ export async function resolveAliases(addresses: Iterable<string>, fetchFn: typeo
     } catch { /* offline or TzKT down: try again next poll */ }
   }
   return learned;
+}
+
+export interface ScoreRow { address: string; score: number }
+
+/**
+ * This round's scores, highest first, from the indexer: the contract keeps them in a big map,
+ * which TzKT lists but cannot sort by value, so every key is fetched (up to 10,000) and sorted here.
+ */
+export async function readLeaderboard(limit = 10, fetchFn: typeof fetch = fetch): Promise<ScoreRow[]> {
+  if (!config.tzktApi || !hasContract()) return [];
+  const res = await fetchFn(`${config.tzktApi}/v1/contracts/${config.contractAddress}/bigmaps/scores/keys?active=true&limit=10000&select=key,value`);
+  if (!res.ok) throw new Error(`TzKT ${res.status}`);
+  const rows = (await res.json()) as { key: string; value: string }[];
+  return rows.map((r) => ({ address: r.key, score: Number(r.value) }))
+    .sort((a, b) => b.score - a.score || a.address.localeCompare(b.address)).slice(0, limit);
 }
 
 /** For tests. */

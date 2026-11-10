@@ -7,5 +7,5 @@ export default defineConfig({
   // The Octez Connect SDK still reaches for Node's `global` in a few places.
   define: { global: "globalThis" },
   build: { target: "es2022" },
-  test: { environment: "node", include: ["src/**/*.test.ts"] },
+  test: { environment: "node", include: ["src/**/*.test.ts", "verifier/**/*.test.ts"] },
 });

@@ -12,7 +12,10 @@
     "test:watch": "vitest",
     "contract:test": "contract/scripts/test-mockup.sh",
     "contract:deploy": "contract/scripts/deploy.sh",
-    "deploy:aws": "deploy/aws-deploy.sh"
+    "deploy:aws": "deploy/aws-deploy.sh",
+    "verifier": "node verifier/server.ts",
+    "verifier:keygen": "node verifier/keygen.ts",
+    "verifier:bundle": "rolldown verifier/lambda.ts --format esm --platform node --file verifier/dist/lambda.mjs"
   },
   "devDependencies": {
     "typescript": "^5.9.0",

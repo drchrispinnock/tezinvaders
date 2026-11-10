@@ -6,3 +6,4 @@ contract/.mockup/
 .DS_Store
 /tmp
 *.swp
+/verifier/dist

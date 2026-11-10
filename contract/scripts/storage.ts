@@ -2,7 +2,7 @@
 // contract metadata and the TZIP-21 token metadata for the five badges, whose images are the
 // hosted SVGs (see export-badges.ts). Runs on plain Node (22.18+ strips the types itself):
 //
-//   node contract/scripts/storage.ts --admin tz1… [--fee 1000000] [--round-length 604800] [--round-ends <unix seconds>] [--image-base <https url/>]
+//   node contract/scripts/storage.ts --admin tz1… --verifier edpk… [--fee 1000000] [--round-length 604800] [--round-ends <unix seconds>] [--image-base <https url/>]
 //
 // With --token-info <id> it instead prints just that badge's token_info literal, the argument
 // for the admin's set_token_metadata entrypoint (`Pair <id> <literal>`).
@@ -16,6 +16,7 @@ import { BADGES, BADGE_IMAGE_BASE, badgeDescription, badgeImageUrl, type Badge }
 const { values } = parseArgs({
   options: {
     admin: { type: "string" },
+    verifier: { type: "string" },
     fee: { type: "string", default: "1000000" },
     "round-length": { type: "string", default: String(24 * 3600) },
     "round-ends": { type: "string" },
@@ -51,8 +52,8 @@ if (values["token-info"] !== undefined) {
   process.exit(0);
 }
 
-if (!values.admin) {
-  console.error("usage: node contract/scripts/storage.ts --admin <tz1…> [--fee <mutez>] [--round-length <seconds>] [--round-ends <unix seconds>]");
+if (!values.admin || !values.verifier) {
+  console.error("usage: node contract/scripts/storage.ts --admin <tz1…> --verifier <edpk…> [--fee <mutez>] [--round-length <seconds>] [--round-ends <unix seconds>]");
   process.exit(2);
 }
 
@@ -73,4 +74,5 @@ const content = JSON.stringify({
 });
 const metadata = bytesMap([["", "tezos-storage:content"], ["content", content]]);
 
-console.log(`Pair "${values.admin}" ${values.fee} 1 0 ${ends} ${length} {} {} {} {} {} { ${tokens} } ${metadata}`);
+// admin fee round pool round_ends round_length verifier leader scores champions best ledger operators token_metadata metadata
+console.log(`Pair "${values.admin}" ${values.fee} 1 0 ${ends} ${length} "${values.verifier}" None {} {} {} {} {} { ${tokens} } ${metadata}`);

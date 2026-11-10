@@ -1,8 +1,10 @@
 import "./polyfills";
 import { config, hasContract, setNetwork } from "./chain/config";
-import { buyTicket, endRound, readBadges, readStorage, setRoundLength, submitScore, type GameStorage } from "./chain/contract";
+import { buyTicket, endRound, readPlayer, readStorage, setRoundLength, submitScore, type GameStorage, type ScoreEntry } from "./chain/contract";
+import { readLeaderboard, resolveAliases } from "./chain/tzkt";
+import { requestAttestation } from "./chain/verifier";
+import { encodeLog } from "./game/sim";
 import { BADGES } from "./chain/badges";
-import { resolveAliases } from "./chain/tzkt";
 import { Wallet } from "./chain/wallet";
 import { Game } from "./game/Game";
 import { Panel, type PanelState } from "./ui/panel";
@@ -13,11 +15,14 @@ const canvas = document.getElementById("game") as HTMLCanvasElement;
 const panelRoot = document.getElementById("panel") as HTMLElement;
 
 const wallet = new Wallet();
-const state: PanelState = { address: null, storage: null, badges: null, busy: false, status: "", error: false, pendingScore: null };
+const state: PanelState = { address: null, storage: null, scores: [], badges: null, busy: false, status: "", error: false, pendingScore: null, pendingGame: null };
 
 const game = new Game(canvas, (e) => {
   if (e.type === "start") state.pendingScore = null;
-  if (e.type === "gameover") state.pendingScore = e.score;
+  if (e.type === "gameover") {
+    state.pendingScore = e.score;
+    state.pendingGame = { seed: game.sim.seed, log: encodeLog(game.sim.log) };
+  }
   if (e.type === "gameover" || e.type === "start") refreshPanel();
 });
 
@@ -29,7 +34,7 @@ if (onL2) document.querySelector<HTMLLinkElement>("link[rel=icon]")?.setAttribut
 
 function refreshPanel(): void {
   const me = state.address;
-  game.staked = Boolean(me && state.storage?.scores.some((s) => s.address === me));
+  game.staked = Boolean(me && state.badges?.ticket !== null && state.badges?.ticket !== undefined);
   panel.render(state);
 }
 
@@ -64,7 +69,7 @@ function describe(err: unknown): string {
   if (err && typeof err === "object" && "message" in err) {
     const msg = String((err as { message: unknown }).message);
     // Surface the contract's FAILWITH string when octez.js wraps it.
-    const m = /with: \{"string":"([A-Z_]+)"\}/.exec(msg) ?? /"(BAD_FEE|NO_TICKET|NOT_ADMIN|NO_TEZ_ACCEPTED|ROUND_OVER|ROUND_RUNNING|BAD_LENGTH|UNPAYABLE_\w+|FA2_\w+)"/.exec(msg);
+    const m = /with: \{"string":"([A-Z_]+)"\}/.exec(msg) ?? /"(BAD_FEE|NO_TICKET|NOT_ADMIN|NO_TEZ_ACCEPTED|ROUND_OVER|ROUND_RUNNING|BAD_LENGTH|BAD_PROOF|PROOF_EXPIRED|UNPAYABLE_\w+|FA2_\w+)"/.exec(msg);
     return m?.[1] ?? msg;
   }
   return String(err);
@@ -74,7 +79,8 @@ async function loadStorage(): Promise<GameStorage | null> {
   if (!hasContract()) return null;
   try {
     state.storage = await readStorage(wallet.tezos);
-    state.badges = state.address ? await readBadges(wallet.tezos, state.address) : null;
+    state.scores = await leaderboard(state.storage.leader);
+    state.badges = state.address ? await readPlayer(wallet.tezos, state.address) : null;
     if (state.error) state.error = false;
   } catch (err) {
     setStatus(`Could not read contract: ${describe(err)}`, true);
@@ -84,10 +90,20 @@ async function loadStorage(): Promise<GameStorage | null> {
   return state.storage;
 }
 
+/** This round's table from the indexer, with the on-chain leader merged in case the indexer lags. */
+async function leaderboard(leader: ScoreEntry | null): Promise<ScoreEntry[]> {
+  const rows = await readLeaderboard().catch(() => state.scores);
+  if (leader && !rows.some((r) => r.address === leader.address && r.score >= leader.score)) {
+    rows.push(leader);
+    rows.sort((a, b) => b.score - a.score || a.address.localeCompare(b.address));
+  }
+  return rows.slice(0, 10);
+}
+
 /** Look up TzKT aliases for everyone on the boards (and the player), re-rendering if any are new. */
 async function nameAddresses(): Promise<void> {
   const s = state.storage;
-  const addresses = [...(s?.scores ?? []).map((e) => e.address), ...(s?.champions ?? []).map((c) => c.player)];
+  const addresses = [...state.scores.map((e) => e.address), ...(s?.champions ?? []).map((c) => c.player)];
   if (state.address) addresses.push(state.address);
   if (await resolveAliases(addresses)) refreshPanel();
 }
@@ -103,10 +119,15 @@ const panel = new Panel(panelRoot, {
     return hash;
   }),
   submitScore: () => run(`Submitting score ${state.pendingScore}`, async () => {
-    const score = state.pendingScore;
-    if (score === null) throw new Error("no score to submit");
-    const hash = await submitScore(wallet.tezos, score);
+    const score = state.pendingScore, game = state.pendingGame, player = state.address;
+    if (score === null || !game) throw new Error("no score to submit");
+    if (!player) throw new Error("not connected");
+    setStatus("Verifying the game…");
+    const a = await requestAttestation(player, score, game);
+    setStatus(`Submitting score ${score}…`);
+    const hash = await submitScore(wallet.tezos, a.score, a.expires, a.proof);
     state.pendingScore = null;
+    state.pendingGame = null;
     const before = state.badges?.owned ?? new Set<number>();
     await loadStorage();
     const earned = BADGES.filter((b) => state.badges?.owned.has(b.id) && !before.has(b.id));

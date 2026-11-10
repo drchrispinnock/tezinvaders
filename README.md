@@ -18,7 +18,8 @@ is free play and the side panel just says so.
 
 ```sh
 npm run contract:test                          # exercise contract/tezinvaders.tz on a local mockup chain
-ADMIN=my-alias npm run contract:deploy         # originate on Shadownet with octez-client; prints the KT1
+npm run verifier:keygen                         # the verifier key pair (see Score verification)
+ADMIN=my-alias VERIFIER=edpk… npm run contract:deploy   # originate on Shadownet with octez-client; prints the KT1
 cp .env.example .env                           # then set VITE_CONTRACT_ADDRESS_SHADOWNET to that KT1
 npm run dev
 ```
@@ -39,6 +40,28 @@ The leaderboard and hall of fame show TzKT account aliases where they exist, eac
 to the account on the network's explorer, and mix in the stand-in entries from
 `src/data/leaderboard.json` (dimmed; converted from `InitialLeaderboard.md` beside it) so the
 board never looks empty.
+
+## Score verification
+
+The browser never reports a bare score. The game simulation is deterministic given its seed
+and the input on every tick, which it records; when you submit, the site sends that recording
+to the verifier, which replays it, checks it ends with the score you claim, and signs an
+attestation (chain, contract, player, score, a 15-minute expiry). The contract accepts a score
+only with a valid attestation from its verifier key. So the only way to a high score is a game
+that actually produces it; the remaining hole is a bot that plays the game perfectly.
+
+Run it locally for development:
+
+```sh
+npm run verifier:keygen                    # prints edsk (secret) and edpk (the contract's verifier key)
+VERIFIER_SECRET_KEY=edsk… npm run verifier # http://localhost:8787; set VITE_VERIFIER_URL in .env
+```
+
+Host it as a Lambda for the live site: create the stack in `deploy/verifier-lambda.yml` with
+the edsk as its parameter, run `deploy/verifier-deploy.sh` to upload the bundle, and put the
+stack's `FunctionUrl` output into `.env.production` as `VITE_VERIFIER_URL`. The contract's
+verifier key is set at origination (`VERIFIER=edpk…` for the deploy script) and can be rotated
+by the admin with `set_verifier`.
 
 ## Hosting
 

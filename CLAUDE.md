@@ -19,8 +19,11 @@ npm run typecheck
 npm test                    # vitest, all tests (src/**/*.test.ts)
 npx vitest run src/game/sim.test.ts -t "reverses"   # single test by file and name pattern
 npm run contract:test       # contract/scripts/test-mockup.sh: originate + exercise the contract on an octez-client mockup chain
-npm run contract:deploy     # ADMIN=<alias> [ENDPOINT=…] [FEE_MUTEZ=…] [ROUND_LENGTH=<s>, default 86400] contract/scripts/deploy.sh
-node contract/scripts/storage.ts --admin tz1…   # print the initial storage literal (used by both scripts)
+npm run contract:deploy     # ADMIN=<alias> VERIFIER=edpk… [ENDPOINT=…] [WAIT=none on Tezos X] [FEE_MUTEZ=…] [ROUND_LENGTH=<s>, default 86400]
+node contract/scripts/storage.ts --admin tz1… --verifier edpk…   # print the initial storage literal (used by both scripts)
+npm run verifier:keygen     # a verifier key pair; the edpk goes to the contract, the edsk to the verifier's environment
+VERIFIER_SECRET_KEY=edsk… npm run verifier   # the score verifier on http://localhost:8787 (VITE_VERIFIER_URL in .env)
+npm run verifier:bundle     # rolldown bundle of the Lambda handler into verifier/dist/lambda.mjs
 node contract/scripts/storage.ts --token-info 2 # one badge's token_info literal, for set_token_metadata
 node contract/scripts/export-badges.ts          # write the badge SVGs to public/badges/
 CONTRACT=KT1… SIGNER=<alias> contract/scripts/end-round.sh   # cron-able: calls end_round once the deadline has passed
@@ -117,16 +120,21 @@ which are per-cell bitmaps eroded by `eraseBlob`.
   `PAIR_INIT` event handler is wrapped so closing the pairing dialog rejects `connect()`; by
   default that close is silent and the UI would sit on "Connecting…" forever. Don't import
   `@taquito/*` or `@airgap/*`; the app no longer depends on them.
-- `contract.ts` — `readStorage()` decodes the Michelson maps into sorted arrays (plus
+- `contract.ts` — `readStorage()` decodes the storage (champions sorted, `leader`, `verifier`,
   `roundEnds` in ms and `roundLength` in s; `roundOver()` compares to the clock);
-  `readBadges()` does the big-map lookups for one player (all-time best, badge balances).
-  `buyTicket`, `submitScore`, `endRound`, `setRoundLength` wrap the entrypoints via
-  `methodsObject` and wait for 1 confirmation. Unit entrypoints must be called with
+  `readPlayer()` does the big-map lookups for one player (ticket this round, all-time best,
+  badge balances). `buyTicket`, `submitScore(score, expires, proof)`, `endRound`,
+  `setRoundLength` wrap the entrypoints via `methodsObject` and wait for 1 confirmation. The
+  round's table itself comes from TzKT (`readLeaderboard()` in `tzkt.ts`, which fetches the
+  scores big map's keys and sorts them here, TzKT cannot sort by value); `main.ts` merges the
+  on-chain leader in case the indexer lags. Unit entrypoints must be called with
   `UnitValue` (from `@tezos-x/octez.js`).
 - `tzkt.ts` — `resolveAliases()` fetches TzKT account aliases in batches from the active
   network's TzKT API (`tzktApi` in `config.ts`: api.shadownet.tzkt.io / api.tzkt.io) into a
   page-lifetime cache; `aliasOf()` reads it. `main.ts` calls it after every storage load for
   everyone on the boards plus the player, and re-renders when a new alias arrives.
+- `verifier.ts` — `requestAttestation()` asks the score verifier for a signed attestation of
+  a recorded game (see Score verification below).
 - `badges.ts` — the five badges (id, slug, name, threshold, sprite) and `badgeSvg()` /
   `badgeDataUri()`, which render the game's own bitmaps to SVG. The panel draws those data
   URIs locally, so it needs no token-metadata reads. The on-chain token metadata instead
@@ -157,33 +165,39 @@ button only if the player holds a ticket and beat their on-chain best), polls st
 
 ### Contract: `contract/tezinvaders.tz`
 
-Hand-written Michelson (no LIGO/SmartPy toolchain assumed). Storage is a 13-field right comb
-accessed with `GET n`/`UPDATE n`: 1 admin, 3 entry_fee, 5 round, 7 pool, 9 round_ends
-(timestamp), 11 round_length (int seconds), 13 scores (`map address nat`, the live
-leaderboard), 15 champions (`map nat (pair address nat)`, round → winner), 17 best
-(`big_map address nat`, all-time best per player), 19 ledger / 21 operators /
-23 token_metadata (FA2), 24 metadata (TZIP-16). `scores` and `champions` are plain `map`s,
-not `big_map`s, so the frontend can read the whole table from storage without an indexer;
-that caps the number of players per round and is a known prototype trade-off.
+Hand-written Michelson (no LIGO/SmartPy toolchain assumed). Storage is a right comb accessed
+with `GET n`/`UPDATE n`: 1 admin, 3 entry_fee, 5 round, 7 pool, 9 round_ends (timestamp),
+11 round_length (int seconds), 13 verifier (`key`, signs score attestations), 15 leader
+(`option (pair address nat)`, this round's top scorer), 17 scores (`big_map address nat`,
+this round's best per ticket holder), 19 champions (`map nat (pair address nat)`, round →
+winner), 21 best (`big_map address nat`, all-time best per player), 23 ledger / 25 operators /
+27 token_metadata (FA2), 28 metadata (TZIP-16). Scores are a big map so a round can have any
+number of players; the frontend reads the table from TzKT (`readLeaderboard()`) and the
+contract never iterates it: the leader is tracked on every submit. `champions` is a plain map
+(one entry per round) read from storage.
 
-Entrypoints: `play` (pay exactly `entry_fee`; inserts the sender with score 0 and rejects
-senders that cannot receive tez; once `round_ends` has passed it first runs the settlement
-below, so the ticket opens the next round), `submit_score` (ticket holders only,
-before `round_ends`, keeps the max; when the player's all-time `best` rises it mints every
-badge whose threshold lies in (old best, new score]), `end_round` (admin at any time, anyone
-once `NOW >= round_ends`; runs the settlement: pays the full pool to the top scorer, ties go
-to the lowest address, archives to `champions`, clears `scores`, increments `round`, sets
-`round_ends = NOW + round_length`; works on an empty round). The settlement is one `LAMBDA`
-pushed at the top of `code` and kept at the bottom of the stack (its storage type is spelt
-out, so it must follow any storage change); `play` and `end_round` `EXEC` it, `set_entry_fee` (admin), `set_round_length` (admin;
-positive seconds; also reschedules the current round to `NOW + length`), `set_token_metadata`
-(admin; replaces one token's `token_info` map), and the TZIP-12 trio
+Entrypoints: `play` (pay exactly `entry_fee`; inserts the sender with score 0, who leads the
+round if nobody does yet; rejects senders that cannot receive tez; once `round_ends` has passed
+it first runs the settlement below, so the ticket opens the next round), `submit_score`
+(`((score, expires), proof)`; ticket holders only, before `round_ends`; `proof` must be the
+verifier's signature over `PACK (pair (pair chain_id self_address) (pair (pair sender score)
+expires))` and `NOW <= expires`; keeps the max; takes the lead when strictly higher than the
+leader's score, so ties keep the earlier leader; when the player's all-time `best` rises it
+mints every badge whose threshold lies in (old best, new score]), `end_round` (admin at any
+time, anyone once `NOW >= round_ends`; runs the settlement: pays the full pool to the leader,
+archives them to `champions`, resets leader and scores (a fresh `EMPTY_BIG_MAP`), increments
+`round`, sets `round_ends = NOW + round_length`; works on an empty round). The settlement is
+one `LAMBDA` pushed at the top of `code` and kept at the bottom of the stack (its storage type
+is spelt out, so it must follow any storage change); `play` and `end_round` `EXEC` it.
+`set_entry_fee` (admin), `set_round_length` (admin; positive seconds; also reschedules the
+current round to `NOW + length`), `set_verifier` (admin; rotates the attestation key),
+`set_token_metadata` (admin; replaces one token's `token_info` map), and the TZIP-12 trio
 `transfer` / `balance_of` / `update_operators` over the badge tokens. Badges are
 semi-fungible: token ids 0–4 (dollar 1000, euro 3000, pound 5000, yen 8000, mothership
 12000), minted at most once per player per id, freely transferable. Failures use string
 `FAILWITH`s (`BAD_FEE`, `NO_TICKET`, `NOT_ADMIN`, `NO_TEZ_ACCEPTED`, `ROUND_OVER`,
-`ROUND_RUNNING`, `BAD_LENGTH`, `UNPAYABLE_*`, `FA2_*`); `main.ts` extracts these from octez.js
-errors.
+`ROUND_RUNNING`, `BAD_LENGTH`, `BAD_PROOF`, `PROOF_EXPIRED`, `UNPAYABLE_*`, `FA2_*`);
+`main.ts` extracts these from octez.js errors.
 
 Michelson layout gotcha: the octez parser rejects a multi-line sequence whose elements start at
 a column left of the opening `{` ("misaligned expression"). Keep the body of `code {` indented
@@ -191,15 +205,38 @@ past the brace, and keep both branches of an `IF*` at the same column. When the 
 complains about layout, flattening the file to one line is a quick way to confirm the logic
 itself is fine.
 
-If the storage shape changes, update all three of: the contract, the literal printed by
-`contract/scripts/storage.ts` (the only place the `--init` comes from), and
-`RawStorage`/`readStorage` in `src/chain/contract.ts`. `test-mockup.sh` reads big maps by
-position (the last five numbers of the storage print) and must follow too.
+If the storage shape changes, update all of: the contract (including the settlement lambda's
+spelt-out storage type), the literal printed by `contract/scripts/storage.ts` (the only place
+the `--init` comes from), `RawStorage`/`readStorage` in `src/chain/contract.ts`, and
+`test-mockup.sh`, which reads big maps by position (the scores id follows the leader; the
+other five are the last five numbers of the storage print).
+
+### Score verification: `verifier/`
+
+`src/game/sim.ts` is deterministic given its seed (`Sim.seed`, a mulberry32 generator
+restarted in `startGame`) and the input on each tick, which it records in `Sim.log` from
+`startGame` to game over (`encodeInput` packs left/right/fire/start into one code;
+`encodeLog`/`decodeLog` are the run-length text form; `replay(seed, log)` rebuilds the game).
+`main.ts` keeps the finished game as `pendingGame` beside `pendingScore`; on "Submit score"
+it POSTs `{chainId, contract, player, score, seed, log}` to `VITE_VERIFIER_URL/attest`
+(`src/chain/verifier.ts`), and the verifier (`verifier/attest.ts`) replays the log, checks it
+ended with that score, and signs `PACK (pair (pair chain_id contract) (pair (pair player
+score) expires))` with its edsk, `expires` being 15 minutes out so an attestation cannot be
+banked for a later round. The contract checks the signature against its `verifier` key.
+`verifier/server.ts` is a plain Node server, `verifier/lambda.ts` the same behind a Lambda
+Function URL (`npm run verifier:bundle` bundles it with rolldown; `deploy/verifier-lambda.yml`
+and `deploy/verifier-deploy.sh` create and update it), `verifier/keygen.ts` makes a key pair
+and `verifier/sign.ts` signs arbitrary claims for the mockup tests, which run the real signing
+code so the packing is checked against the chain. Node runs the verifier directly; the
+octez.js packages are CommonJS to it, hence the default-import-and-destructure style there.
+The verifier's secret lives only in its environment (and the admin's ignored `.env`).
 
 ## Known prototype limitations
 
-- Scores are self-reported by the browser; nothing stops a player submitting an arbitrary
-  number. The planned fix is a verifier key whose signed score attestation the contract checks.
+- Scores are attested by the verifier, which only proves the recorded inputs produce that
+  score in the simulation. A bot that plays the deterministic game perfectly gets a genuine
+  attestation; rate limits and anti-bot heuristics are not in place. The verifier is a trusted
+  service: whoever holds its key can sign any score (rotate with `set_verifier`).
 - Rounds settle lazily: the first ticket after the deadline pays out the old round. A round
   nobody follows waits for `end_round`; the panel shows everyone the button and
   `deploy/end-rounds.sh` (hourly launchd job on the admin's Mac, plist in `deploy/`) calls it

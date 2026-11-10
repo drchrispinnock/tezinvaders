@@ -4,7 +4,7 @@
 
 import {
   BANK, BANK_POINTS, BUNKER, INVADER_H, INVADER_W, PX, ROW_KINDS, SHIP, bitmapSize, type InvaderKind,
-} from "./sprites";
+} from "./sprites.ts";
 
 export const WIDTH = 560;
 export const HEIGHT = 640;
@@ -118,7 +118,27 @@ export class Sim {
   phaseTimer = 0;
   events: GameEvent[] = [];
 
-  constructor(private readonly rng: () => number = Math.random) {}
+  /** Seed of the current game. The generator restarts from it in startGame, so a recorded game replays exactly. */
+  seed = 0;
+  /** The current game's inputs, one code per tick (encodeInput), from startGame until gameover. */
+  log: number[] = [];
+  private recording = false;
+  private prng = 0;
+  private readonly rng: () => number;
+
+  /** Pass an rng to replace the seeded generator (tests do, to suppress bombs and the bank). */
+  constructor(rng?: () => number) {
+    this.rng = rng ?? (() => this.random());
+  }
+
+  /** mulberry32 over `prng`: fast, and identical on every platform. */
+  private random(): number {
+    this.prng = (this.prng + 0x6d2b79f5) | 0;
+    let t = this.prng;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  }
 
   get aliveCount(): number {
     return this.invaders.reduce((n, i) => n + (i.alive ? 1 : 0), 0);
@@ -144,7 +164,11 @@ export class Sim {
     return { x: this.bank.x, y: BANK_Y, w: BANK_SIZE.w * PX, h: BANK_SIZE.h * PX };
   }
 
-  startGame(): void {
+  startGame(seed = randomSeed()): void {
+    this.seed = seed;
+    this.prng = seed | 0;
+    this.log = [];
+    this.recording = true;
     this.score = 0;
     this.lives = 3;
     this.wave = 1;
@@ -171,6 +195,7 @@ export class Sim {
 
   step(input: Input): void {
     this.tick++;
+    if (this.recording) this.log.push(encodeInput(input));
     switch (this.phase) {
       case "intro":
         if (input.start) this.phase = "title";
@@ -348,6 +373,7 @@ export class Sim {
   }
 
   private endGame(): void {
+    this.recording = false;
     this.phase = "gameover";
     this.events.push({ type: "gameover", score: this.score, wave: this.wave });
   }
@@ -398,4 +424,55 @@ export class Sim {
       for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) bunker.cells[y * BUNKER_SIZE.w + x] = 0;
     }
   }
+}
+
+// ---- Recording and replay -------------------------------------------------------------------
+//
+// A game is fully determined by its seed and the input on each tick, so the verifier can replay
+// a recorded game from scratch and check the claimed score (see verifier/attest.ts).
+
+export const encodeInput = (i: Input): number => (i.left ? 1 : 0) | (i.right ? 2 : 0) | (i.fire ? 4 : 0) | (i.start ? 8 : 0);
+export const decodeInput = (c: number): Input => ({ left: (c & 1) !== 0, right: (c & 2) !== 0, fire: (c & 4) !== 0, start: (c & 8) !== 0 });
+
+/** A random 32-bit seed. */
+export function randomSeed(): number {
+  const c = globalThis.crypto;
+  if (c?.getRandomValues) return c.getRandomValues(new Uint32Array(1))[0] ?? 0;
+  return Math.floor(Math.random() * 4294967296);
+}
+
+/** Run-length text form of a log: "code*count" pairs, e.g. "0*120,4*3,5*40". */
+export function encodeLog(log: readonly number[]): string {
+  const runs: string[] = [];
+  for (let i = 0; i < log.length;) {
+    const code = log[i]!;
+    let end = i;
+    while (end < log.length && log[end] === code) end++;
+    runs.push(`${code}*${end - i}`);
+    i = end;
+  }
+  return runs.join(",");
+}
+
+/** Inverse of encodeLog. Throws on malformed text or a log longer than `maxTicks`. */
+export function decodeLog(text: string, maxTicks = 1_000_000): number[] {
+  const log: number[] = [];
+  if (text === "") return log;
+  for (const run of text.split(",")) {
+    const m = /^(\d{1,2})\*(\d{1,7})$/.exec(run);
+    const code = m ? Number(m[1]) : -1;
+    const count = m ? Number(m[2]) : 0;
+    if (!m || code > 15 || count === 0) throw new Error(`bad input log near "${run.slice(0, 20)}"`);
+    if (log.length + count > maxTicks) throw new Error("input log too long");
+    for (let i = 0; i < count; i++) log.push(code);
+  }
+  return log;
+}
+
+/** Replay a recorded game from its seed. The result's phase is "gameover" when the log ran to the end of a game. */
+export function replay(seed: number, log: readonly number[]): Sim {
+  const sim = new Sim();
+  sim.startGame(seed);
+  for (const code of log) sim.step(decodeInput(code));
+  return sim;
 }

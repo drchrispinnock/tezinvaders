@@ -15,16 +15,19 @@ export interface GameStorage {
   roundEnds: number;
   /** Seconds each new round runs for. */
   roundLength: number;
-  /** Current round, best score per ticket holder, highest first. */
-  scores: ScoreEntry[];
+  /** The key whose attestations submit_score accepts. */
+  verifier: string;
+  /** This round's top scorer so far (the first ticket holder, at 0, until someone scores). */
+  leader: ScoreEntry | null;
   /** Past round winners, most recent first. */
   champions: Champion[];
 }
 
-/** A player's badge state: all-time best score and the badge ids they currently hold. */
-export interface PlayerBadges {
+/** One player's state: all-time best, badges held, and their score this round (null without a ticket). */
+export interface PlayerState {
   best: number;
   owned: ReadonlySet<number>;
+  ticket: number | null;
 }
 
 interface RawStorage {
@@ -34,7 +37,9 @@ interface RawStorage {
   pool: BigNumber;
   round_ends: string;
   round_length: BigNumber;
-  scores: MichelsonMap<string, BigNumber>;
+  verifier: string;
+  leader: { player: string; score: BigNumber } | null;
+  scores: BigMapAbstraction;
   champions: MichelsonMap<BigNumber, { player: string; score: BigNumber }>;
   best: BigMapAbstraction;
   ledger: BigMapAbstraction;
@@ -49,9 +54,6 @@ export const roundOver = (s: GameStorage, now = Date.now()): boolean => now >= s
 
 export async function readStorage(tezos: TezosToolkit): Promise<GameStorage> {
   const raw = await rawStorage(tezos);
-  const scores: ScoreEntry[] = [];
-  raw.scores.forEach((score, address) => scores.push({ address, score: score.toNumber() }));
-  scores.sort((a, b) => b.score - a.score || a.address.localeCompare(b.address));
   const champions: Champion[] = [];
   raw.champions.forEach((c, round) => champions.push({ round: Number(round), player: c.player, score: c.score.toNumber() }));
   champions.sort((a, b) => b.round - a.round);
@@ -62,21 +64,23 @@ export async function readStorage(tezos: TezosToolkit): Promise<GameStorage> {
     pool: raw.pool.toNumber(),
     roundEnds: Date.parse(raw.round_ends),
     roundLength: raw.round_length.toNumber(),
-    scores,
+    verifier: raw.verifier,
+    leader: raw.leader ? { address: raw.leader.player, score: raw.leader.score.toNumber() } : null,
     champions,
   };
 }
 
-/** Big map lookups for one player: their all-time best and which badges they hold. */
-export async function readBadges(tezos: TezosToolkit, address: string): Promise<PlayerBadges> {
+/** Big map lookups for one player: their ticket this round, all-time best and which badges they hold. */
+export async function readPlayer(tezos: TezosToolkit, address: string): Promise<PlayerState> {
   const raw = await rawStorage(tezos);
-  const [best, ...balances] = await Promise.all([
+  const [ticket, best, ...balances] = await Promise.all([
+    raw.scores.get<BigNumber>(address),
     raw.best.get<BigNumber>(address),
     ...BADGES.map((b) => raw.ledger.get<BigNumber>({ owner: address, token_id: b.id })),
   ]);
   const owned = new Set<number>();
   balances.forEach((bal, i) => { if (bal && bal.gt(0)) owned.add(BADGES[i]!.id); });
-  return { best: best?.toNumber() ?? 0, owned };
+  return { best: best?.toNumber() ?? 0, owned, ticket: ticket ? ticket.toNumber() : null };
 }
 
 async function method(tezos: TezosToolkit, name: string) {
@@ -93,8 +97,9 @@ export async function buyTicket(tezos: TezosToolkit, entryFeeMutez: number): Pro
   return op.opHash;
 }
 
-export async function submitScore(tezos: TezosToolkit, score: number): Promise<string> {
-  const op = await (await method(tezos, "submit_score"))(score).send();
+/** Record an attested score: `expires` (unix seconds) and `proof` come from the verifier. */
+export async function submitScore(tezos: TezosToolkit, score: number, expires: number, proof: string): Promise<string> {
+  const op = await (await method(tezos, "submit_score"))({ score, expires: new Date(expires * 1000).toISOString(), proof }).send();
   await op.confirmation(1);
   return op.opHash;
 }
