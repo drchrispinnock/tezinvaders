@@ -205,8 +205,10 @@ export class Panel {
       return `<figure class="door ${state}" title="${day + 1} December${owned(day) ? " · yours" : state === "today" ? " · today" : ""}">
         <img src="${adventImageUrl(day, import.meta.env.BASE_URL + "badges/")}" alt="Door ${day + 1}" loading="lazy"><figcaption>${day + 1}</figcaption></figure>`;
     }).join("");
-    const canClaim = me && hasTicket && today !== null && !owned(today) && s.pendingScore !== null && s.pendingScore > ADVENT_THRESHOLD;
-    const caption = today === null
+    const canClaim = !preview && me && hasTicket && today !== null && !owned(today) && s.pendingScore !== null && s.pendingScore > ADVENT_THRESHOLD;
+    const caption = preview
+      ? "Preview: this is how the calendar will look from 1 December."
+      : today === null
       ? "The calendar has closed for this year."
       : !me ? `Ticket holders who score over ${ADVENT_THRESHOLD} on a December day open that day's door.`
       : owned(today) ? `Door ${today + 1} is yours. Come back tomorrow.`
