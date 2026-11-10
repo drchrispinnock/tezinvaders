@@ -37,6 +37,8 @@ canvas:focus { border-color: var(--tez); }
 .panel td { padding: 3px 0; border-bottom: 1px dotted var(--line); }
 .panel td:last-child { text-align: right; color: var(--gold); }
 .panel tr.me td { color: var(--ok); }
+.panel td a, .panel .addr a { color: inherit; text-decoration: none; border-bottom: 1px dotted currentColor; }
+.panel td a:hover, .panel .addr a:hover { color: var(--gold); border-bottom-style: solid; }
 .panel .status { color: var(--muted); min-height: 1.4em; word-break: break-all; }
 .panel .status.error { color: var(--danger); }
 .panel .muted { color: var(--muted); }

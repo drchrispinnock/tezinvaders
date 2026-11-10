@@ -33,6 +33,10 @@ export interface PanelActions {
 /** The TzKT alias when the account has one, otherwise the shortened address. */
 export const displayName = (address: string): string => aliasOf(address) ?? shortAddress(address);
 
+/** The name as a link to the account on the network's TzKT explorer, opening in a new tab. */
+const explorerLink = (address: string, text = displayName(address)): string =>
+  `<a href="${config.explorer}/${address}" target="_blank" rel="noopener" title="${address} on TzKT">${text}</a>`;
+
 /** "3d 4h", "2h 15m", "40m", "<1m" */
 export function formatDuration(ms: number): string {
   const minutes = Math.floor(ms / 60_000);
@@ -85,7 +89,7 @@ export class Panel {
       `<button data-network="${n.name}" class="${n.name === config.network ? "on" : ""}" ${dis} aria-pressed="${n.name === config.network}">${n.label}</button>`).join("")}</div>`;
 
     const walletHtml = me
-      ? `<div class="row"><span class="addr" title="${me}">${displayName(me)}</span>
+      ? `<div class="row"><span class="addr">${explorerLink(me)}</span>
            <button class="secondary" data-action="disconnect" ${dis}>Disconnect</button></div>`
       : `<div class="row"><span class="muted">Not connected</span>
            <button data-action="connect" ${dis}>Connect wallet</button></div>`;
@@ -128,11 +132,11 @@ export class Panel {
     const badgesHtml = hasContract() ? this.badges(s, me) : "";
 
     const rows = (s.storage?.scores ?? []).slice(0, 10).map((e, i) =>
-      `<tr class="${e.address === me ? "me" : ""}"><td>${i + 1}.</td><td title="${e.address}">${displayName(e.address)}</td><td>${e.score}</td></tr>`).join("");
+      `<tr class="${e.address === me ? "me" : ""}"><td>${i + 1}.</td><td>${explorerLink(e.address)}</td><td>${e.score}</td></tr>`).join("");
     const fakeRows = [...(FAKE_LEADERBOARD as FakeEntry[])].sort((a, b) => b.score - a.score).slice(0, 10).map((e, i) =>
-      `<tr class="${e.address === me ? "me" : ""}"><td>${i + 1}.</td><td title="${e.address ?? ""}">${e.name}</td><td>${e.score}</td></tr>`).join("");
+      `<tr class="${e.address === me ? "me" : ""}"><td>${i + 1}.</td><td>${e.address ? explorerLink(e.address, e.name) : e.name}</td><td>${e.score}</td></tr>`).join("");
     const champs = (s.storage?.champions ?? []).slice(0, 10).map((c) =>
-      `<tr class="${c.player === me ? "me" : ""}"><td>R${c.round}</td><td title="${c.player}">${displayName(c.player)}</td><td>${c.score}</td></tr>`).join("");
+      `<tr class="${c.player === me ? "me" : ""}"><td>R${c.round}</td><td>${explorerLink(c.player)}</td><td>${c.score}</td></tr>`).join("");
 
     this.root.innerHTML = `
       <h1><img class="logo" src="${import.meta.env.BASE_URL}tezos.svg" alt="" width="18" height="24" /> TEZINVADERS</h1>
