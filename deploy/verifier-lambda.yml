@@ -62,6 +62,13 @@ Resources:
       Action: lambda:InvokeFunctionUrl
       Principal: "*"
       FunctionUrlAuthType: NONE
+  # Public function URLs need the plain invoke permission too.
+  InvokePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref Function
+      Action: lambda:InvokeFunction
+      Principal: "*"
 Outputs:
   FunctionUrl:
     Value: !GetAtt Url.FunctionUrl
