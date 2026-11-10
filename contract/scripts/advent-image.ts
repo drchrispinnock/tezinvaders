@@ -2,7 +2,8 @@
 // (the files the token metadata points at):
 //   1-5   the game's invaders and the mothership, in Santa hats
 //   6-15  other currencies of the world
-//   16-20 Ms BLS, Captain Stake, the Glorious Testnet Dictator, The Rollup Dude, Farrah Faucet
+//   16-20 Ms BLS, Captain Stake, the Glorious Testnet Dictator, The Rollup Dude, Farrah Faucet: their
+//         TzKT avatars (contract/assets/characters) in Santa hats
 //   21-23 the Signet ring, the Etherlink mark, the Tezos ꜩ
 //   24-25 Christmas pudding, Christmas tree
 //
@@ -105,7 +106,13 @@ const glyph = (bitmap: Bitmap, color: string): Design => ({ bitmap, palette: { "
 const person = (bitmap: Bitmap, hair: string, detail: string, accent: string): Design =>
   ({ bitmap, palette: { "#": hair, o: SKIN, "+": detail, "*": accent }, hat: true });
 
-const SIGNET_PNG = readFileSync(new URL("../assets/signet-128.png", import.meta.url)).toString("base64");
+const png64 = (file: string): string => readFileSync(new URL(`../assets/${file}`, import.meta.url)).toString("base64");
+const SIGNET_PNG = png64("signet-128.png");
+/** A character's TzKT avatar (contract/assets/characters, fetched from services.tzkt.io/v1/avatars) with a Santa hat. */
+const portrait = (file: string): Design => ({
+  svg: `<image href="data:image/png;base64,${png64(`characters/${file}`)}" x="10" y="12" width="44" height="44"/>` +
+    `<g transform="translate(20 2) scale(2)">${layer(HAT, "#", 0, 0, RED)}${layer(HAT, "o", 0, 0, SNOW)}</g>`,
+});
 const ETHERLINK = readFileSync(new URL("../assets/etherlink.svg", import.meta.url), "utf8")
   .replace(/<\?xml[^>]*>/, "").replace(/<svg[^>]*>/, "").replace("</svg>", "")
   .replace(/<defs>[\s\S]*?<\/defs>/, "").replace(/class="cls-1"/g, 'fill="#262626"').replace(/class="cls-2"/g, 'fill="#38ff9c"');
@@ -118,11 +125,11 @@ const DESIGNS: Record<number, Design> = {
   5: { bitmap: BANK, palette: { "#": BANK_COLOR, o: BANK_SHADE }, hat: true },
   6: glyph(RUPEE, "#ff8c42"), 7: glyph(WON, "#5ad1ff"), 8: glyph(RUBLE, "#ff4d6d"), 9: glyph(LIRA, "#ff6b6b"), 10: glyph(SHEKEL, "#4db8ff"),
   11: glyph(BAHT, "#c77dff"), 12: glyph(NAIRA, "#3ddc84"), 13: glyph(PESO, "#ffd34d"), 14: glyph(HRYVNIA, "#ffe66d"), 15: glyph(DONG, "#ff9f1c"),
-  16: person(MS_BLS, "#c0392b", "#2c3e50", "#ffd34d"),
-  17: person(CAPTAIN_STAKE, "#2c7df7", "#ffd34d", "#e8333f"),
-  18: person(DICTATOR, "#4b5320", "#2c3e50", "#ffd34d"),
-  19: person(ROLLUP_DUDE, "#7f88a8", "#2c3e50", "#e6e9f5"),
-  20: person(FARRAH, "#f0c419", "#2c3e50", "#5ad1ff"),
+  16: portrait("ms-bls.png"),
+  17: portrait("captain-stake.png"),
+  18: portrait("glorius-testnet-dictator.png"),
+  19: portrait("the-rollup-dude.png"),
+  20: portrait("farrah-faucet.png"),
   21: { svg: `<image href="data:image/png;base64,${SIGNET_PNG}" x="8" y="6" width="48" height="48" image-rendering="auto"/>` },
   22: { svg: `<svg x="10" y="8" width="44" height="44" viewBox="0 0 1080 1080">${ETHERLINK}</svg>` },
   23: { svg: `<svg x="17" y="8" width="30" height="42" viewBox="0 0 47 64"><path fill="${TEZ}" d="${LOGO_PATH}"/></svg>` },
@@ -144,10 +151,10 @@ function runs(bitmap: Bitmap, ch: string, ox: number, oy: number): string {
   });
   return d;
 }
-const layer = (bitmap: Bitmap, ch: string, ox: number, oy: number, color: string): string => {
+function layer(bitmap: Bitmap, ch: string, ox: number, oy: number, color: string): string {
   const d = runs(bitmap, ch, ox, oy);
   return d ? `<path fill="${color}" d="${d}"/>` : "";
-};
+}
 
 /** A tiny deterministic generator so each day's snowfall differs but is stable. */
 function prng(seed: number): () => number {

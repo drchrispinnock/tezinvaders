@@ -250,9 +250,10 @@ the pool or the leaderboard; the day comes from `NOW` against `advent.start` (st
 set at origination from `src/chain/advent.ts`, movable with the admin's `set_advent (start,
 first_token)` for another year). The 25 token metadata entries are part of the initial storage
 (`storage.ts`), pointing at `public/badges/advent/NN.svg`; `contract/scripts/advent-image.ts`
-draws the 25 doors (1-5 the invaders, 6-15 world currencies, 16-20 the stand-in characters,
-21-23 the Signet ring, Etherlink and Tezos marks from `contract/assets/`, 24-25 pudding and
-tree; pixel bitmaps with a palette each) and `public/badges/advent/index.html` is a contact
+draws the 25 doors (1-5 the invaders, 6-15 world currencies as pixel glyphs, 16-20 the stand-in
+characters' TzKT avatars from `contract/assets/characters/` in Santa hats, 21-23 the Signet
+ring, Etherlink and Tezos marks from `contract/assets/`, 24-25 pudding and tree as pixel
+bitmaps) and `public/badges/advent/index.html` is a contact
 sheet. Overwrite a door's SVG to replace its art. The panel shows the calendar from 1 to 31 December (`Panel.advent`: doors owned,
 today, missed, locked; the player's token ids come from TzKT via `readTokenIds`), and
 `?preview=advent` on the URL shows it as if it were 1 December. Errors: `ADVENT_SCORE`,
