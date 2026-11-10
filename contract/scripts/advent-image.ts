@@ -3,7 +3,7 @@
 //   1-5   the game's invaders and the mothership, in Santa hats
 //   6-15  other currencies of the world
 //   16-20 Ms BLS, Captain Stake, the Glorious Testnet Dictator, The Rollup Dude, Farrah Faucet: their
-//         TzKT avatars (contract/assets/characters) in Santa hats
+//         TzKT avatars (contract/assets/characters)
 //   21-23 the Signet ring, the Etherlink mark, the Tezos ꜩ
 //   24-25 Christmas pudding, Christmas tree
 //
@@ -108,10 +108,9 @@ const person = (bitmap: Bitmap, hair: string, detail: string, accent: string): D
 
 const png64 = (file: string): string => readFileSync(new URL(`../assets/${file}`, import.meta.url)).toString("base64");
 const SIGNET_PNG = png64("signet-128.png");
-/** A character's TzKT avatar (contract/assets/characters, fetched from services.tzkt.io/v1/avatars) with a Santa hat. */
+/** A character's TzKT avatar (contract/assets/characters, fetched from services.tzkt.io/v1/avatars). */
 const portrait = (file: string): Design => ({
-  svg: `<image href="data:image/png;base64,${png64(`characters/${file}`)}" x="10" y="12" width="44" height="44"/>` +
-    `<g transform="translate(20 2) scale(2)">${layer(HAT, "#", 0, 0, RED)}${layer(HAT, "o", 0, 0, SNOW)}</g>`,
+  svg: `<image href="data:image/png;base64,${png64(`characters/${file}`)}" x="10" y="8" width="44" height="44"/>`,
 });
 const ETHERLINK = readFileSync(new URL("../assets/etherlink.svg", import.meta.url), "utf8")
   .replace(/<\?xml[^>]*>/, "").replace(/<svg[^>]*>/, "").replace("</svg>", "")

@@ -251,7 +251,7 @@ set at origination from `src/chain/advent.ts`, movable with the admin's `set_adv
 first_token)` for another year). The 25 token metadata entries are part of the initial storage
 (`storage.ts`), pointing at `public/badges/advent/NN.svg`; `contract/scripts/advent-image.ts`
 draws the 25 doors (1-5 the invaders, 6-15 world currencies as pixel glyphs, 16-20 the stand-in
-characters' TzKT avatars from `contract/assets/characters/` in Santa hats, 21-23 the Signet
+characters' TzKT avatars from `contract/assets/characters/`, 21-23 the Signet
 ring, Etherlink and Tezos marks from `contract/assets/`, 24-25 pudding and tree as pixel
 bitmaps) and `public/badges/advent/index.html` is a contact
 sheet. Overwrite a door's SVG to replace its art. The panel shows the calendar from 1 to 31 December (`Panel.advent`: doors owned,
