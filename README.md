@@ -96,8 +96,8 @@ Build-time config lives in the committed `.env.production`.
   bucket, an Origin Access Control, security headers and HTTPS. Create it once, then
   `BUCKET=… DISTRIBUTION_ID=… npm run deploy:aws` builds and publishes. Costs a few cents a month.
   The live site, https://tezinvaders.xyz, is this: bucket `tezinvaders-site`, distribution
-  `EXG3G4877J7V`, deployed with the S3-only `homes3` profile, which cannot invalidate the
-  CloudFront cache (grant `cloudfront:CreateInvalidation` or invalidate `/*` in the console).
+  `EXG3G4877J7V`, deployed with the S3-only `homes3` profile and invalidated with the `home` one:
+  `BUCKET=tezinvaders-site DISTRIBUTION_ID=EXG3G4877J7V AWS_PROFILE=homes3 INVALIDATE_PROFILE=home npm run deploy:aws`.
 
 The badge token metadata on chain names the image URL, so after choosing a host repoint the
 five tokens with `set_token_metadata` (see `CLAUDE.md`).

@@ -82,7 +82,10 @@ One static target:
   revalidation on the rest, uploads a copy of `index.html` under every network path from
   `networks.json` (with and without a trailing slash, since CloudFront's default root object only
   covers `/` and the distribution has no rewrite rule), and invalidates the distribution (the
-  user's `homes3` profile is S3-only, so that last step is refused and they invalidate by hand).
+  user's `homes3` profile is S3-only; `INVALIDATE_PROFILE=home` does that last step; the live
+  deploy is `BUCKET=tezinvaders-site DISTRIBUTION_ID=EXG3G4877J7V AWS_PROFILE=homes3
+  INVALIDATE_PROFILE=home npm run deploy:aws`). The verifier Lambda stack is `tezinvaders-verifier`
+  in us-east-1, created with the `home` profile.
   The site is served from `/`, so no base path.
 - Vite's `base` still follows `BASE_PATH`, and anything that builds a URL in code goes through
   `import.meta.env.BASE_URL` (see the panel's logo), so the site can be served under a path

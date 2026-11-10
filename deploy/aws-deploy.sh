@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Build the site and publish dist/ to the S3 bucket behind CloudFront, then invalidate.
-# Usage: BUCKET=<bucket> [DISTRIBUTION_ID=<id>] [AWS_PROFILE=<profile>] deploy/aws-deploy.sh
+# Usage: BUCKET=<bucket> [DISTRIBUTION_ID=<id>] [AWS_PROFILE=<profile>] [INVALIDATE_PROFILE=<profile>] deploy/aws-deploy.sh
 # Hashed assets are cached for a year; index.html and the badge SVGs are revalidated on each visit.
 # Each network lives at its own path (/shadownet, /shadownet/tezosx, …; src/chain/networks.json), so
 # a copy of index.html is uploaded under each path (with and without a trailing slash): CloudFront's
@@ -18,7 +18,8 @@ for route in $(node -e 'for (const n of require("./src/chain/networks.json").net
     aws s3api put-object --bucket "$BUCKET" --key "$key" --body dist/index.html --content-type "text/html; charset=utf-8" --cache-control "public, max-age=0, must-revalidate" --query ETag --output text >/dev/null
   done
 done
+# The upload profile may be S3-only; INVALIDATE_PROFILE names one allowed to invalidate CloudFront.
 if [ -n "${DISTRIBUTION_ID:-}" ]; then
-  aws cloudfront create-invalidation --distribution-id "$DISTRIBUTION_ID" --paths "/*" --query 'Invalidation.Id' --output text
+  AWS_PROFILE="${INVALIDATE_PROFILE:-${AWS_PROFILE:-}}" aws cloudfront create-invalidation --distribution-id "$DISTRIBUTION_ID" --paths "/*" --query 'Invalidation.Id' --output text
 fi
 echo "Deployed dist/ to s3://$BUCKET"
