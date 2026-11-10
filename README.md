@@ -51,6 +51,11 @@ L2 is Tezos X, the Etherlink rollup's Michelson interface, which runs the same c
 combination has its own contract address in `.env` (`VITE_CONTRACT_ADDRESS_MAINNET`,
 `VITE_CONTRACT_ADDRESS_TEZOSX_SHADOWNET`, …), deployed with the matching `ENDPOINT=` (for
 example `https://rpc.tzkt.io/mainnet` or `https://michelson.etherlink.shadownet.octez.io`).
+To fund the admin on Tezos X, bridge tez from L1: a transfer to the network's bridge helper
+(Shadownet `KT19aBsSWvWtvEkbiqReJnD8UzQMWcD8SHUD`, rollup `sr19fMYrr5C4qqvQqQrDSjtP31GcrWjodzvg`)
+calling `deposit` with the rollup address and the RLP routing data for the tz1 receiver; Signet's
+Bridge menu does the same. Originating on the L2 node works, but octez-client never sees the
+confirmation and has to be interrupted; check the result on the Etherlink TzKT instead.
 
 ## Layout
 

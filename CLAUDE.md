@@ -37,7 +37,10 @@ mockup chain's `NOW` is stuck at the epoch, so deadline tests originate with exp
 Runtime config comes from `.env` (see `.env.example`): per network, `VITE_RPC_URL_<NET>` and
 `VITE_CONTRACT_ADDRESS_<NET>` for `SHADOWNET`, `MAINNET`, `TEZOSX_SHADOWNET` and
 `TEZOSX_MAINNET` (the last two are Tezos X, the Etherlink rollup's Michelson interface: same
-contracts, same tz keys, RPCs at michelson.etherlink.<chain>.octez.io). `.env.production` is committed
+contracts, same tz keys, RPCs at michelson.etherlink.<chain>.octez.io). Deploying there: fund the
+admin by bridging from L1 (see README), originate with `ENDPOINT=<L2 rpc>`; octez-client hangs
+waiting for the confirmation, so stop it and read the KT1 from api.<chain>.etherlink.tzkt.io.
+Storage burn on L2 is negligible. `.env.production` is committed
 (the values are public) and is what `vite build` and the Pages workflow use. The panel has a Shadownet / Mainnet
 toggle and an L1 / L2 toggle (a `Chain` and a `Layer`, combined by `networkFor()` into one of
 the four `NetworkName`s), Shadownet L1 by default, persisted in `localStorage`; switching disconnects the wallet and

@@ -15,9 +15,9 @@ export interface Network {
   readonly label: string;
   readonly rpcUrl: string;
   readonly contractAddress: string;
-  /** TzKT API root for account aliases on the leaderboards; empty when the network has no indexer yet. */
+  /** TzKT API root for account aliases on the leaderboards (Etherlink TzKT covers the Michelson side too). */
   readonly tzktApi: string;
-  /** TzKT block explorer root (accounts at `<root>/<address>`); empty when there is none. */
+  /** TzKT block explorer root (accounts at `<root>/<address>`). */
   readonly explorer: string;
 }
 
@@ -45,16 +45,16 @@ export const NETWORKS: Readonly<Record<NetworkName, Network>> = {
     label: "Tezos X Shadownet",
     rpcUrl: env.VITE_RPC_URL_TEZOSX_SHADOWNET ?? "https://michelson.etherlink.shadownet.octez.io",
     contractAddress: env.VITE_CONTRACT_ADDRESS_TEZOSX_SHADOWNET ?? "",
-    tzktApi: "",
-    explorer: "https://shadownet.tezlink.tzkt.io",
+    tzktApi: "https://api.shadownet.etherlink.tzkt.io",
+    explorer: "https://shadownet.etherlink.tzkt.io",
   },
   "tezosx-mainnet": {
     name: "tezosx-mainnet", chain: "mainnet", layer: "l2",
     label: "Tezos X Mainnet",
     rpcUrl: env.VITE_RPC_URL_TEZOSX_MAINNET ?? "https://michelson.etherlink.mainnet.octez.io",
     contractAddress: env.VITE_CONTRACT_ADDRESS_TEZOSX_MAINNET ?? "",
-    tzktApi: "",
-    explorer: "",
+    tzktApi: "https://api.etherlink.tzkt.io",
+    explorer: "https://etherlink.tzkt.io",
   },
 };
 
