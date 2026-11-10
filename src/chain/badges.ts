@@ -64,7 +64,9 @@ export function badgeSvg(b: Badge): string {
     const d = runs(b.bitmap, ch, ox, oy);
     return d ? `<path fill="${color}" d="${d}"/>` : "";
   }).join("");
-  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${box} ${box}" shape-rendering="crispEdges">` +
+  // An intrinsic 512px size: wallets and explorers that rasterise SVGs do so at the declared size and
+  // would otherwise draw this tiny pixel grid at a few dozen pixels and scale it up blurred.
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${box} ${box}" width="512" height="512" shape-rendering="crispEdges">` +
     `<rect width="${box}" height="${box}" fill="#05070f"/>${paths}</svg>`;
 }
 
