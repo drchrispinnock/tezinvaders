@@ -38,6 +38,8 @@ body.l2 .panel h1 { color: var(--gold); }
 .panel button:disabled { opacity: 0.4; cursor: default; }
 .panel .row { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin: 4px 0; }
 .panel .addr { color: var(--gold); }
+.panel .free { color: var(--muted); letter-spacing: 1px; text-transform: uppercase; font-size: 11px; }
+.panel section > p.muted { margin: 4px 0 0; }
 .panel .big { font-size: 20px; color: var(--ok); }
 .panel table { width: 100%; border-collapse: collapse; }
 .panel td { padding: 3px 0; border-bottom: 1px dotted var(--line); }

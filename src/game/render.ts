@@ -129,6 +129,10 @@ export class Renderer {
       const xW = this.layer2 ? 9 : 0;
       ctx.fillText("STAKED", WIDTH - 12 - xW - logoWidth(markH) - 6, HEIGHT - 10);
       this.drawMark(WIDTH - 12 - xW - logoWidth(markH), HEIGHT - 10 - markH + 1, markH, "#ffd34d");
+    } else {
+      ctx.textAlign = "right";
+      ctx.fillStyle = "#7f88a8";
+      ctx.fillText("FREE PLAY", WIDTH - 12, HEIGHT - 10);
     }
   }
 

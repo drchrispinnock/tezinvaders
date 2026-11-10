@@ -161,7 +161,8 @@ ticket and Submit score are disabled and everyone sees the End round button. `ma
 wires game events to it (a `gameover` event sets `pendingScore`, shown as a "Submit score"
 button only if the player holds a ticket and beat their on-chain best), polls storage every
 20 s, and routes every wallet call through `run()` so busy/status/error handling is uniform.
-`game.staked` only reflects whether the connected address is in the current round's `scores` map.
+`game.staked` only reflects whether the connected address holds a ticket this round; without one
+the HUD says FREE PLAY and the prize-pool section tells the player to connect and buy a ticket.
 
 ### Contract: `contract/tezinvaders.tz`
 
