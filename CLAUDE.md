@@ -57,7 +57,8 @@ Two targets, both static:
   Origin Access Control and a security-headers policy; no CSP yet, because Octez Connect
   pairing talks to relay hosts that would need listing). `deploy/aws-deploy.sh`
   (`npm run deploy:aws`) builds, syncs `dist/` with long cache headers on `assets/` and
-  revalidation on the rest, and invalidates the distribution. The site is served from `/`,
+  revalidation on the rest, and invalidates the distribution (the user's `homes3` profile is
+  S3-only, so that last step is refused and they invalidate by hand). The site is served from `/`,
   so no base path.
 - **GitHub Pages**: `.github/workflows/pages.yml` builds on every push to `main` with
   `BASE_PATH=/tezinvaders/` so Vite emits prefixed URLs; locally the base stays `/`.

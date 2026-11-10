@@ -23,15 +23,22 @@ cp .env.example .env                           # then set VITE_CONTRACT_ADDRESS_
 npm run dev
 ```
 
-Rounds have a deadline on chain (one week by default, `ROUND_LENGTH` at deploy time or the
-admin's "Round length" box in the panel). The admin can end a round at any time; once the
-deadline has passed anyone can press "End round & pay out", and `contract/scripts/end-round.sh`
-does the same from cron. The pool goes in full to the round's top scorer.
+Rounds have a deadline on chain (one day by default, `ROUND_LENGTH` at deploy time or the
+admin's "Round length" box in the panel). The pool goes in full to the round's top scorer: the
+first ticket bought after the deadline settles the round itself, the admin can end a round at
+any time, and once the deadline has passed anyone can press "End round & pay out" (see "Round
+payouts" below for the hourly backstop).
 
 Scores also earn badges: FA2 tokens the contract mints the first time a player's all-time best
-reaches 1,000 ($), 3,000 (€), 5,000 (£), 8,000 (¥) and 12,000 (the mothership). They show in
-the panel and in any wallet or explorer that lists FA2 tokens; the images are served with the
-site from `public/badges/` (regenerate them with `node contract/scripts/export-badges.ts`).
+reaches 1,000 (Dollar TezInvader), 3,000 (Euro), 5,000 (Pound), 8,000 (Yen) and 12,000 (the
+TezInvaders Mothership). They show in the panel and in any wallet or explorer that lists FA2
+tokens; the images are served with the site from `public/badges/` (regenerate them with
+`node contract/scripts/export-badges.ts`).
+
+The leaderboard and hall of fame show TzKT account aliases where they exist, each name linking
+to the account on the network's explorer, and mix in the stand-in entries from
+`src/data/leaderboard.json` (dimmed; converted from `InitialLeaderboard.md` beside it) so the
+board never looks empty.
 
 ## Hosting
 
@@ -40,6 +47,9 @@ Build-time config lives in the committed `.env.production`. Two ready-made targe
 - **AWS (S3 + CloudFront).** `deploy/aws-site.yml` is a CloudFormation stack with a private
   bucket, an Origin Access Control, security headers and HTTPS. Create it once, then
   `BUCKET=… DISTRIBUTION_ID=… npm run deploy:aws` builds and publishes. Costs a few cents a month.
+  The live site, https://tezinvaders.xyz, is this: bucket `tezinvaders-site`, distribution
+  `EXG3G4877J7V`, deployed with the S3-only `homes3` profile, which cannot invalidate the
+  CloudFront cache (grant `cloudfront:CreateInvalidation` or invalidate `/*` in the console).
 - **GitHub Pages.** Pushing to `main` builds and deploys via `.github/workflows/pages.yml`
   (enable Pages once with "GitHub Actions" as the source).
 
