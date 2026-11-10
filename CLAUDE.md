@@ -136,7 +136,7 @@ which are per-cell bitmaps eroded by `eraseBlob`.
 wallet row go through `displayName()`: the TzKT alias when there is one, else the short
 address (the full address stays in the `title` tooltip). While the current round has no
 on-chain scores the leaderboard shows the stand-in list in `src/data/leaderboard.json`
-(`[{ "name", "score" }]`, sorted by score, captioned "No scores on-chain yet"); edit that
+(`[{ "address"?, "name", "score" }]`, converted from `InitialLeaderboard.md` beside it, sorted by score, captioned "No scores on-chain yet"); edit that
 file to change it (`resolveJsonModule` is on for the import). Inputs carry `data-field` and their
 typed values survive re-renders in `Panel.drafts` (the admin's round-length box). The round
 deadline is shown as "ends in …" and refreshes with the 20 s storage poll; once passed, Buy

@@ -1,5 +1,27 @@
 [
-  { "name": "Captain Stake", "score": 9450 },
-  { "name": "Ms BLS", "score": 7120 },
-  { "name": "Quantum Man", "score": 4380 }
+  {
+    "address": "tz1N29q5T3jJ2i1JEWHax7q1NRkDMADj6fof",
+    "name": "Ms BLS",
+    "score": 40000
+  },
+  {
+    "address": "tz1dCaMnnMJk76UodjewCK67ABiXWjcKj73N",
+    "name": "Captain Stake",
+    "score": 30000
+  },
+  {
+    "address": "tz1Xf8zdT3DbAX9cHw3c3CXh79rc4nK4gCe8",
+    "name": "Glorius Testnet Dictator",
+    "score": 25000
+  },
+  {
+    "address": "tz1gf5kytEm87svJaehGfDyfny5te2UeDZQa",
+    "name": "The Rollup Dude",
+    "score": 20000
+  },
+  {
+    "address": "tz1a4GT7THHaGDiTxgXoatDWcZfJ5j29z5RC",
+    "name": "Farrah Faucet",
+    "score": 15000
+  }
 ]

@@ -5,7 +5,7 @@ import { aliasOf } from "../chain/tzkt";
 import FAKE_LEADERBOARD from "../data/leaderboard.json";
 
 /** A row of the stand-in leaderboard shown while the round has no on-chain scores (src/data/leaderboard.json). */
-interface FakeEntry { name: string; score: number }
+interface FakeEntry { address?: string; name: string; score: number }
 
 export interface PanelState {
   address: string | null;
@@ -130,7 +130,7 @@ export class Panel {
     const rows = (s.storage?.scores ?? []).slice(0, 10).map((e, i) =>
       `<tr class="${e.address === me ? "me" : ""}"><td>${i + 1}.</td><td title="${e.address}">${displayName(e.address)}</td><td>${e.score}</td></tr>`).join("");
     const fakeRows = [...(FAKE_LEADERBOARD as FakeEntry[])].sort((a, b) => b.score - a.score).slice(0, 10).map((e, i) =>
-      `<tr><td>${i + 1}.</td><td>${e.name}</td><td>${e.score}</td></tr>`).join("");
+      `<tr class="${e.address === me ? "me" : ""}"><td>${i + 1}.</td><td title="${e.address ?? ""}">${e.name}</td><td>${e.score}</td></tr>`).join("");
     const champs = (s.storage?.champions ?? []).slice(0, 10).map((c) =>
       `<tr class="${c.player === me ? "me" : ""}"><td>R${c.round}</td><td title="${c.player}">${displayName(c.player)}</td><td>${c.score}</td></tr>`).join("");
 
