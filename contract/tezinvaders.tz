@@ -5,7 +5,8 @@
 #   3  entry_fee      mutez          price of one ticket for the current round
 #   5  round          nat            current round number (starts at 1)
 #   7  pool           mutez          prize pool for the current round
-#   9  round_ends     timestamp      from this moment anyone may call end_round; play and submit_score refuse
+#   9  round_ends     timestamp      from this moment anyone may call end_round, submit_score refuses, and the
+#                                    next play settles the round itself before taking the ticket
 #   11 round_length   int            seconds; each new round ends NOW + round_length
 #   13 scores         map address nat               live leaderboard: best score per ticket holder this round
 #   15 champions      map nat (pair address nat)    hall of fame: round -> (winner, score)
@@ -16,11 +17,13 @@
 #   24 metadata       big_map string bytes                               TZIP-16 contract metadata
 #
 # Badges (FA2 token ids), minted once per player the first time their all-time best reaches the threshold:
-#   0 Dollar Invader  1000    1 Euro Invader  3000    2 Pound Invader  5000
-#   3 Yen Invader     8000    4 Mothership   12000
+#   0 Dollar TezInvader  1000    1 Euro TezInvader  3000    2 Pound TezInvader  5000
+#   3 Yen TezInvader     8000    4 TezInvaders Mothership   12000
 #
 # Entrypoints:
-#   play              pay exactly entry_fee; grants a ticket (score 0) and grows the pool
+#   play              pay exactly entry_fee; grants a ticket (score 0) and grows the pool. After the
+#                     deadline it first settles the finished round (see end_round) and the ticket
+#                     goes into the new one, so payouts never depend on an off-chain caller
 #   submit_score n    ticket holders record a score; kept only if higher than their best; mints badges
 #   end_round         pay the whole pool to the top scorer, archive them, start a new round.
 #                     Admin at any time; anyone once round_ends has passed.
@@ -53,16 +56,50 @@ storage (pair (address %admin)
               (big_map %token_metadata nat (pair (nat %token_id) (map %token_info string bytes)))
               (big_map %metadata string bytes));
 code {
-       UNPAIR;
+       UNPAIR;                                                     # param : storage
+       # Settlement, run by end_round, and by play once the deadline has passed (lazy settlement:
+       # the first ticket after the deadline pays out the old round and starts the new one, so
+       # payouts never depend on anyone calling end_round). Pays the whole pool to the top
+       # scorer (ties: lowest address), archives them, clears the board, bumps the round and
+       # sets the next deadline. Kept at the bottom of the stack for the entrypoints to EXEC.
+       # (LAMBDA needs the storage type spelt out; keep it in step with the storage declaration.)
+       LAMBDA
+         (pair address mutez nat mutez timestamp int (map address nat) (map nat (pair address nat)) (big_map address nat) (big_map (pair address nat) nat) (big_map (pair address (pair address nat)) unit) (big_map nat (pair nat (map string bytes))) (big_map string bytes))
+         (pair (list operation) (pair address mutez nat mutez timestamp int (map address nat) (map nat (pair address nat)) (big_map address nat) (big_map (pair address nat) nat) (big_map (pair address (pair address nat)) unit) (big_map nat (pair nat (map string bytes))) (big_map string bytes)))
+         { NONE (pair address nat);
+           DUP 2; GET 13;
+           ITER { SWAP;
+                  IF_NONE { SOME }
+                          { DUP; CDR; DUP 3; CDR; COMPARE; GT;
+                            IF { DROP; SOME } { SWAP; DROP; SOME } } };
+           IF_NONE
+             { NIL operation }
+             { # winner : storage
+               DUP 2; GET 15; DUP 2; SOME; DUP 4; GET 5; UPDATE;   # champions' : winner : storage
+               DIG 2; SWAP; UPDATE 15; SWAP;                        # winner : storage
+               CAR; CONTRACT unit;
+               IF_NONE { PUSH string "UNPAYABLE_WINNER"; FAILWITH } {};
+               DUP 2; GET 7; UNIT; TRANSFER_TOKENS;
+               NIL operation; SWAP; CONS };
+           # ops : storage
+           SWAP;
+           PUSH mutez 0; UPDATE 7;
+           EMPTY_MAP address nat; UPDATE 13;
+           DUP; GET 5; PUSH nat 1; ADD; UPDATE 5;
+           DUP; GET 11; NOW; ADD; UPDATE 9;
+           SWAP; PAIR };
+       DUG 2;                                                      # param : storage : settle
        IF_LEFT
          { IF_LEFT
              { IF_LEFT
-                 { # --- play ---                                   unit : storage
+                 { # --- play ---                                   unit : storage : settle
                    DROP;
                    DUP; GET 3; AMOUNT; COMPARE; EQ;
                    IF {} { PUSH string "BAD_FEE"; FAILWITH };
-                   DUP; GET 9; NOW; COMPARE; LT;
-                   IF {} { PUSH string "ROUND_OVER"; FAILWITH };
+                   # Past the deadline: settle the old round first; this ticket is for the new one.
+                   DUP; GET 9; NOW; COMPARE; GE;
+                   IF { DUP 2; SWAP; EXEC; UNPAIR } { NIL operation };  # ops : storage : settle
+                   SWAP;                                              # storage : ops : settle
                    # Refuse ticket holders we could never pay out to.
                    SENDER; CONTRACT unit;
                    IF_NONE { PUSH string "UNPAYABLE_SENDER"; FAILWITH } { DROP };
@@ -71,7 +108,7 @@ code {
                    IF_NONE
                      { DUP; GET 13; PUSH nat 0; SOME; SENDER; UPDATE; UPDATE 13 }
                      { DROP };
-                   NIL operation; PAIR }
+                   SWAP; PAIR }
                  { # --- submit_score ---                           new : storage
                    PUSH mutez 0; AMOUNT; COMPARE; EQ;
                    IF {} { PUSH string "NO_TEZ_ACCEPTED"; FAILWITH };
@@ -110,35 +147,13 @@ code {
                       { DROP 2 };
                    NIL operation; PAIR } }
              { IF_LEFT
-                 { # --- end_round ---                              unit : storage
+                 { # --- end_round ---                              unit : storage : settle
                    DROP;
                    DUP; GET 1; SENDER; COMPARE; EQ;
                    IF {}
                       { DUP; GET 9; NOW; COMPARE; GE;
                         IF {} { PUSH string "ROUND_RUNNING"; FAILWITH } };
-                   # Scan the leaderboard for the top score. Ties keep the first seen (lowest address).
-                   NONE (pair address nat);
-                   DUP 2; GET 13;
-                   ITER { SWAP;
-                          IF_NONE { SOME }
-                                  { DUP; CDR; DUP 3; CDR; COMPARE; GT;
-                                    IF { DROP; SOME } { SWAP; DROP; SOME } } };
-                   IF_NONE
-                     { NIL operation }
-                     { # winner : storage
-                       DUP 2; GET 15; DUP 2; SOME; DUP 4; GET 5; UPDATE;   # champions' : winner : storage
-                       DIG 2; SWAP; UPDATE 15; SWAP;                        # winner : storage
-                       CAR; CONTRACT unit;
-                       IF_NONE { PUSH string "UNPAYABLE_WINNER"; FAILWITH } {};
-                       DUP 2; GET 7; UNIT; TRANSFER_TOKENS;
-                       NIL operation; SWAP; CONS };
-                   # ops : storage
-                   SWAP;
-                   PUSH mutez 0; UPDATE 7;
-                   EMPTY_MAP address nat; UPDATE 13;
-                   DUP; GET 5; PUSH nat 1; ADD; UPDATE 5;
-                   DUP; GET 11; NOW; ADD; UPDATE 9;
-                   SWAP; PAIR }
+                   DUP 2; SWAP; EXEC }
                  { # --- set_entry_fee ---                          fee : storage
                    DUP 2; GET 1; SENDER; COMPARE; EQ;
                    IF {} { PUSH string "NOT_ADMIN"; FAILWITH };
@@ -207,4 +222,5 @@ code {
                UNPAIR;                                          # id : info : storage
                DUP 3; GET 23; DUP 3; DUP 3; PAIR; SOME; DIG 2; UPDATE;   # tm' : info : storage
                DIP { DROP }; UPDATE 23;
-               NIL operation; PAIR } } }
+               NIL operation; PAIR } };
+       SWAP; DROP }

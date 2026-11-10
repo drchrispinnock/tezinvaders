@@ -11,12 +11,13 @@ ADMIN="${ADMIN:?set ADMIN to an octez-client key alias that will own the contrac
 FEE_MUTEZ="${FEE_MUTEZ:-1000000}"
 ROUND_LENGTH="${ROUND_LENGTH:-86400}"
 BURN_CAP="${BURN_CAP:-25}"
+WAIT="${WAIT:-1}"          # confirmations to wait for; use WAIT=none on Tezos X, whose node never reports them
 NAME="${NAME:-tezinvaders}"
 
 admin_addr=$(octez-client -E "$ENDPOINT" show address "$ADMIN" 2>/dev/null | awk '/Hash/{print $2}')
 init=$(node "$HERE/storage.ts" --admin "$admin_addr" --fee "$FEE_MUTEZ" --round-length "$ROUND_LENGTH")
 echo "Originating $NAME on $ENDPOINT, admin=$admin_addr fee=${FEE_MUTEZ}mutez round=${ROUND_LENGTH}s (storage literal: ${#init} chars)"
-octez-client -E "$ENDPOINT" originate contract "$NAME" transferring 0 from "$ADMIN" \
+octez-client -E "$ENDPOINT" -w "$WAIT" originate contract "$NAME" transferring 0 from "$ADMIN" \
   running "$HERE/../tezinvaders.tz" \
   --init "$init" --burn-cap "$BURN_CAP" --force
 echo

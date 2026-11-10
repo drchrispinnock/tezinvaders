@@ -117,8 +117,8 @@ export class Panel {
         <div class="row"><span>Prize pool</span><span class="big">${formatTez(st.pool)}</span></div>
         <div class="row"><span>Entry fee</span><span>${formatTez(st.entryFee)}</span></div>
         <div class="row">
-          <span>${hasTicket ? `Ticket held · best ${myEntry?.score ?? 0}` : "No ticket this round"}</span>
-          <button data-action="buyTicket" ${dis} ${!me || over ? "disabled" : ""}>${hasTicket ? "Top up pool" : "Buy ticket"}</button>
+          <span>${over ? `Next ticket pays out and starts round ${st.round + 1}` : hasTicket ? `Ticket held · best ${myEntry?.score ?? 0}` : "No ticket this round"}</span>
+          <button data-action="buyTicket" ${dis} ${!me ? "disabled" : ""}>${hasTicket && !over ? "Top up pool" : "Buy ticket"}</button>
         </div>
         ${s.pendingScore !== null && hasTicket && s.pendingScore > (myEntry?.score ?? 0)
           ? over

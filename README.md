@@ -55,7 +55,15 @@ To fund the admin on Tezos X, bridge tez from L1: a transfer to the network's br
 (Shadownet `KT19aBsSWvWtvEkbiqReJnD8UzQMWcD8SHUD`, rollup `sr19fMYrr5C4qqvQqQrDSjtP31GcrWjodzvg`)
 calling `deposit` with the rollup address and the RLP routing data for the tz1 receiver; Signet's
 Bridge menu does the same. Originating on the L2 node works, but octez-client never sees the
-confirmation and has to be interrupted; check the result on the Etherlink TzKT instead.
+confirmation: pass `WAIT=none` to the deploy script and read the KT1 from the Etherlink TzKT.
+
+## Round payouts
+
+The contract settles itself: the first ticket bought after a round's deadline pays the pool to
+that round's top scorer and opens the next round in the same transaction. As a backstop for
+rounds nobody follows, `deploy/end-rounds.sh` calls `end_round` on every contract listed in
+`.env.production` once its deadline has passed; `deploy/com.tezinvaders.end-rounds.plist`
+runs it hourly under launchd (install steps are in the plist's comment).
 
 ## Layout
 

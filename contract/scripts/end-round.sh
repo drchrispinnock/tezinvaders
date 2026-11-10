@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 # Call end_round if the current round's deadline has passed. Safe to run from cron or launchd;
-# it does nothing while a round is still running. Any funded key works as SIGNER once the
+# it does nothing while a round is still running. The contract also settles itself on the
+# first ticket bought after the deadline, so this is only the backstop for quiet rounds.
+# Injects without waiting for inclusion (-w none): the Tezos X node never reports it. Any funded key works as SIGNER once the
 # deadline is past (the admin can end a round at any time).
 # Usage: ENDPOINT=https://rpc.shadownet.teztnets.com CONTRACT=KT1… SIGNER=<alias> contract/scripts/end-round.sh
 set -euo pipefail
@@ -18,4 +20,4 @@ if [ "$now" -lt "$ends" ]; then
   exit 0
 fi
 echo "Deadline $round_ends has passed; ending the round."
-octez-client -E "$ENDPOINT" transfer 0 from "$SIGNER" to "$CONTRACT" --entrypoint end_round --burn-cap 1
+octez-client -E "$ENDPOINT" -w none transfer 0 from "$SIGNER" to "$CONTRACT" --entrypoint end_round --burn-cap 1

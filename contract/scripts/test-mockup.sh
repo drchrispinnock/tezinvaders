@@ -129,11 +129,26 @@ expect_ok   "P2 can still transfer badge 0" transfer 0 from $P2 to tezinvaders -
 echo "a round whose deadline has passed"
 init=$(node "$HERE/storage.ts" --admin "$admin_addr" --fee 1000000 --round-length $WEEK --round-ends 0)
 expect_ok   "origination" originate contract closed transferring 0 from $ADMIN running "$CONTRACT" --init "$init" --burn-cap 20 --force
-expect_fail "no tickets after the deadline" ROUND_OVER transfer 1 from $P1 to closed --entrypoint play --burn-cap 1
-expect_fail "no scores after the deadline"  ROUND_OVER transfer 0 from $P1 to closed --entrypoint submit_score --arg 10 --burn-cap 1
+expect_fail "no scores after the deadline" ROUND_OVER transfer 0 from $P1 to closed --entrypoint submit_score --arg 10 --burn-cap 1
 expect_ok   "anyone can end it" transfer 0 from $P3 to closed --entrypoint end_round --burn-cap 1
 s=$(storage closed); echo "$s" | grep -q " 2 0 \"1970-01-08T00:00:01Z\" $WEEK " && ok "round 2 runs for a week from now" || bad "closed reset" "$s"
 expect_ok   "tickets sell again" transfer 1 from $P1 to closed --entrypoint play --burn-cap 1
+
+echo "lazy settlement: a ticket bought after the deadline pays out the old round"
+# Round 1 already over at origination, with P2 on the board and 1 tez in the pool (funded by the origination).
+init=$(node "$HERE/storage.ts" --admin "$admin_addr" --fee 1000000 --round-length $WEEK --round-ends 0 | sed "s/ 1 0 0 $WEEK {} {} / 1 1000000 0 $WEEK { Elt \"$p2_addr\" 700 } {} /")
+expect_ok   "origination with a finished round" originate contract stale transferring 1 from $ADMIN running "$CONTRACT" --init "$init" --burn-cap 20 --force
+expect_fail "nobody can score into it" ROUND_OVER transfer 0 from $P2 to stale --entrypoint submit_score --arg 900 --burn-cap 1
+before=$(balance $P2)
+expect_ok   "P1 buys a ticket" transfer 1 from $P1 to stale --entrypoint play --burn-cap 1
+after=$(balance $P2)
+awk -v a="$after" -v b="$before" 'BEGIN{exit !(a-b > 0.99 && a-b < 1.01)}' \
+  && ok "P2 was paid the 1 tez pool by P1's ticket ($before -> $after)" || bad "lazy payout" "before=$before after=$after"
+s=$(storage stale)
+echo "$s" | grep -q "Elt 1 (Pair \"$p2_addr\" 700)" && ok "champions[1] = P2 / 700" || bad "stale champions" "$s"
+echo "$s" | grep -q " 2 1000000 \"1970-01-08T00:00:01Z\" $WEEK { Elt \"$p1_addr\" 0 } " && ok "round 2 holds P1's ticket and fee, deadline a week out" || bad "stale reset" "$s"
+expect_ok   "P1 scores in the new round" transfer 0 from $P1 to stale --entrypoint submit_score --arg 10 --burn-cap 1
+expect_fail "the new round cannot be ended early by a player" ROUND_RUNNING transfer 0 from $P3 to stale --entrypoint end_round --burn-cap 1
 
 echo
 echo "$pass passed, $fail failed"

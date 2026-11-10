@@ -24,6 +24,7 @@ node contract/scripts/storage.ts --admin tz1…   # print the initial storage li
 node contract/scripts/storage.ts --token-info 2 # one badge's token_info literal, for set_token_metadata
 node contract/scripts/export-badges.ts          # write the badge SVGs to public/badges/
 CONTRACT=KT1… SIGNER=<alias> contract/scripts/end-round.sh   # cron-able: calls end_round once the deadline has passed
+SIGNER=<alias> deploy/end-rounds.sh                        # the same for every contract in .env.production (hourly launchd job)
 ```
 
 The contract scripts need `octez-client` on PATH and `node` (22.18+, it runs the TypeScript
@@ -164,13 +165,16 @@ leaderboard), 15 champions (`map nat (pair address nat)`, round → winner), 17 
 not `big_map`s, so the frontend can read the whole table from storage without an indexer;
 that caps the number of players per round and is a known prototype trade-off.
 
-Entrypoints: `play` (pay exactly `entry_fee`, before `round_ends`; inserts the sender with
-score 0 and rejects senders that cannot receive tez), `submit_score` (ticket holders only,
+Entrypoints: `play` (pay exactly `entry_fee`; inserts the sender with score 0 and rejects
+senders that cannot receive tez; once `round_ends` has passed it first runs the settlement
+below, so the ticket opens the next round), `submit_score` (ticket holders only,
 before `round_ends`, keeps the max; when the player's all-time `best` rises it mints every
 badge whose threshold lies in (old best, new score]), `end_round` (admin at any time, anyone
-once `NOW >= round_ends`; pays the full pool to the top scorer, ties go to the lowest address,
-archives to `champions`, clears `scores`, increments `round`, sets `round_ends = NOW +
-round_length`; works on an empty round), `set_entry_fee` (admin), `set_round_length` (admin;
+once `NOW >= round_ends`; runs the settlement: pays the full pool to the top scorer, ties go
+to the lowest address, archives to `champions`, clears `scores`, increments `round`, sets
+`round_ends = NOW + round_length`; works on an empty round). The settlement is one `LAMBDA`
+pushed at the top of `code` and kept at the bottom of the stack (its storage type is spelt
+out, so it must follow any storage change); `play` and `end_round` `EXEC` it, `set_entry_fee` (admin), `set_round_length` (admin;
 positive seconds; also reschedules the current round to `NOW + length`), `set_token_metadata`
 (admin; replaces one token's `token_info` map), and the TZIP-12 trio
 `transfer` / `balance_of` / `update_operators` over the badge tokens. Badges are
@@ -195,8 +199,10 @@ position (the last five numbers of the storage print) and must follow too.
 
 - Scores are self-reported by the browser; nothing stops a player submitting an arbitrary
   number. The planned fix is a verifier key whose signed score attestation the contract checks.
-- Nothing calls `end_round` automatically when the deadline passes: the panel shows everyone
-  the button, and `contract/scripts/end-round.sh` can be run from cron.
+- Rounds settle lazily: the first ticket after the deadline pays out the old round. A round
+  nobody follows waits for `end_round`; the panel shows everyone the button and
+  `deploy/end-rounds.sh` (hourly launchd job on the admin's Mac, plist in `deploy/`) calls it
+  for every contract in `.env.production`.
 - Badge pictures are hosted with the site at tezinvaders.xyz, not on chain; if the site moves
   the admin repoints the tokens with `set_token_metadata` (literal from
   `storage.ts --token-info <id> --image-base <new base>`).
