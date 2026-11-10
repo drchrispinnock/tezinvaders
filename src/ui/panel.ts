@@ -131,10 +131,13 @@ export class Panel {
 
     const badgesHtml = hasContract() ? this.badges(s, me) : "";
 
-    const rows = (s.storage?.scores ?? []).slice(0, 10).map((e, i) =>
-      `<tr class="${e.address === me ? "me" : ""}"><td>${i + 1}.</td><td>${explorerLink(e.address)}</td><td>${e.score}</td></tr>`).join("");
-    const fakeRows = [...(FAKE_LEADERBOARD as FakeEntry[])].sort((a, b) => b.score - a.score).slice(0, 10).map((e, i) =>
-      `<tr class="${e.address === me ? "me" : ""}"><td>${i + 1}.</td><td>${e.address ? explorerLink(e.address, e.name) : e.name}</td><td>${e.score}</td></tr>`).join("");
+    // One ranked table: the round's on-chain scores plus the stand-in entries (src/data/leaderboard.json),
+    // the latter dimmed and dropped once the same address holds a real ticket.
+    const real = (s.storage?.scores ?? []).map((e) => ({ address: e.address, name: displayName(e.address), score: e.score, standIn: false }));
+    const taken = new Set(real.map((e) => e.address));
+    const standIns = (FAKE_LEADERBOARD as FakeEntry[]).filter((e) => !e.address || !taken.has(e.address)).map((e) => ({ ...e, standIn: true }));
+    const rows = [...real, ...standIns].sort((a, b) => b.score - a.score).slice(0, 10).map((e, i) =>
+      `<tr class="${e.address === me ? "me" : ""} ${e.standIn ? "stand-in" : ""}"><td>${i + 1}.</td><td>${e.address ? explorerLink(e.address, e.name) : e.name}</td><td>${e.score}</td></tr>`).join("");
     const champs = (s.storage?.champions ?? []).slice(0, 10).map((c) =>
       `<tr class="${c.player === me ? "me" : ""}"><td>R${c.round}</td><td>${explorerLink(c.player)}</td><td>${c.score}</td></tr>`).join("");
 
@@ -144,7 +147,7 @@ export class Panel {
       <section><h2>Prize pool</h2>${poolHtml}</section>
       ${badgesHtml}
       <section><h2>Leaderboard · this round</h2>
-        ${rows ? `<table>${rows}</table>` : fakeRows ? `<table>${fakeRows}</table><p class="muted">No scores on-chain yet.</p>` : `<p class="muted">No scores yet.</p>`}</section>
+        ${rows ? `<table>${rows}</table>` : `<p class="muted">No scores yet.</p>`}</section>
       <section><h2>Hall of fame</h2>
         ${champs ? `<table>${champs}</table>` : `<p class="muted">No rounds finished yet.</p>`}</section>
       <section><div class="status ${s.error ? "error" : ""}">${s.status}</div></section>`;

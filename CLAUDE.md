@@ -135,10 +135,11 @@ which are per-cell bitmaps eroded by `eraseBlob`.
 `data-action` names that map 1:1 onto `PanelActions`. Addresses on the boards and in the
 wallet row go through `explorerLink()`: the TzKT alias when there is one, else the short
 address, as a link to the account on the network's TzKT explorer (`explorer` in
-`config.ts`) opening in a new tab, with the full address in the tooltip. While the current round has no
-on-chain scores the leaderboard shows the stand-in list in `src/data/leaderboard.json`
-(`[{ "address"?, "name", "score" }]`, converted from `InitialLeaderboard.md` beside it, sorted by score, captioned "No scores on-chain yet"); edit that
-file to change it (`resolveJsonModule` is on for the import). Inputs carry `data-field` and their
+`config.ts`) opening in a new tab, with the full address in the tooltip. The leaderboard merges the round's on-chain scores with the
+stand-in entries in `src/data/leaderboard.json` (`[{ "address"?, "name", "score" }]`,
+converted from `InitialLeaderboard.md` beside it) into one table ranked by score; stand-in
+rows are dimmed (`tr.stand-in`) and a stand-in is dropped once its address holds a real
+ticket. Edit that file to change the list (`resolveJsonModule` is on for the import). Inputs carry `data-field` and their
 typed values survive re-renders in `Panel.drafts` (the admin's round-length box). The round
 deadline is shown as "ends in …" and refreshes with the 20 s storage poll; once passed, Buy
 ticket and Submit score are disabled and everyone sees the End round button. `main.ts` owns the single `PanelState`,
