@@ -273,7 +273,8 @@ Function URL, reading its keys from the Secrets Manager secret in `VERIFIER_SECR
 (`deploy/verifier-secret.sh` writes it from `.env`; Quantumnet's ML-DSA key exceeds the Lambda
 environment limit) (`npm run verifier:bundle` bundles it with rolldown, the AWS SDK left
 external since the runtime ships it; `deploy/verifier-lambda.yml` and `deploy/verifier-deploy.sh`
-create and update it), `verifier/keygen.ts` makes a key pair
+create and update it; the handler sends no CORS headers because the function URL adds them and
+browsers reject the duplicate), `verifier/keygen.ts` makes a key pair
 and `verifier/sign.ts` signs arbitrary claims for the mockup tests, which run the real signing
 code so the packing is checked against the chain. Node runs the verifier directly; the
 octez.js packages are CommonJS to it, hence the default-import-and-destructure style there.

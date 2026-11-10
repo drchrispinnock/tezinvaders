@@ -7,7 +7,7 @@
 // back to VERIFIER_SECRET_KEY in the environment, which is enough for ed25519-only setups.
 
 import { GetSecretValueCommand, SecretsManagerClient } from "@aws-sdk/client-secrets-manager";
-import { CORS_HEADERS, handle, keysFromEnv, keysFromJson, type VerifierKeys } from "./http.ts";
+import { handle, keysFromEnv, keysFromJson, type VerifierKeys } from "./http.ts";
 
 interface Event { requestContext: { http: { method: string; path: string } }; body?: string; isBase64Encoded?: boolean }
 
@@ -24,6 +24,11 @@ async function loadKeys(): Promise<VerifierKeys> {
 export async function handler(event: Event): Promise<{ statusCode: number; headers: Record<string, string>; body: string }> {
   keys ??= loadKeys().catch((e: unknown) => { keys = undefined; throw e; });
   const body = event.body ? (event.isBase64Encoded ? Buffer.from(event.body, "base64").toString("utf8") : event.body) : "";
-  const r = await handle(event.requestContext.http.method, event.requestContext.http.path, body, await keys);
-  return { statusCode: r.status, headers: CORS_HEADERS, body: r.body };
+  const { method, path } = event.requestContext.http;
+  const r = await handle(method, path, body, await keys);
+  // The function URL adds the CORS headers itself; sending them here too would duplicate them,
+  // which browsers reject. Log outcomes (never bodies: they hold the game) for diagnosis.
+  if (r.status !== 200 && r.status !== 204) console.log(`${method} ${path} -> ${r.status} ${r.body.slice(0, 200)}`);
+  else if (method === "POST") console.log(`${method} ${path} -> ${r.status}`);
+  return { statusCode: r.status, headers: { "Content-Type": "application/json" }, body: r.body };
 }
