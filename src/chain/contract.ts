@@ -30,6 +30,16 @@ export interface PlayerState {
   ticket: number | null;
 }
 
+interface RawLeaderRecord { player: string; score: BigNumber }
+type RawLeader = RawLeaderRecord | { Some: RawLeaderRecord };
+
+/** Normalises the decoder's shape for `option (pair address nat)`. */
+export function decodeLeader(raw: RawLeader | null | undefined): ScoreEntry | null {
+  if (!raw) return null;
+  const rec = "Some" in raw ? raw.Some : raw;
+  return rec ? { address: rec.player, score: Number(rec.score) } : null;
+}
+
 interface RawStorage {
   admin: string;
   entry_fee: BigNumber;
@@ -38,7 +48,8 @@ interface RawStorage {
   round_ends: string;
   round_length: BigNumber;
   verifier: string;
-  leader: { player: string; score: BigNumber } | null;
+  /** octez.js gives an option of a record as `{ Some: record }` (or the bare record), and null for None. */
+  leader: RawLeader | null;
   scores: BigMapAbstraction;
   champions: MichelsonMap<BigNumber, { player: string; score: BigNumber }>;
   best: BigMapAbstraction;
@@ -65,7 +76,7 @@ export async function readStorage(tezos: TezosToolkit): Promise<GameStorage> {
     roundEnds: Date.parse(raw.round_ends),
     roundLength: raw.round_length.toNumber(),
     verifier: raw.verifier,
-    leader: raw.leader ? { address: raw.leader.player, score: raw.leader.score.toNumber() } : null,
+    leader: decodeLeader(raw.leader),
     champions,
   };
 }
