@@ -131,12 +131,13 @@ export class Panel {
 
     const badgesHtml = hasContract() ? this.badges(s, me) : "";
 
-    // One ranked table: the round's on-chain scores plus the stand-in entries (src/data/leaderboard.json),
+    // One table: the round's on-chain scores ranked first, then the stand-in entries (src/data/leaderboard.json),
     // the latter dimmed and dropped once the same address holds a real ticket.
     const real = (s.storage?.scores ?? []).map((e) => ({ address: e.address, name: displayName(e.address), score: e.score, standIn: false }));
     const taken = new Set(real.map((e) => e.address));
     const standIns = (FAKE_LEADERBOARD as FakeEntry[]).filter((e) => !e.address || !taken.has(e.address)).map((e) => ({ ...e, standIn: true }));
-    const rows = [...real, ...standIns].sort((a, b) => b.score - a.score).slice(0, 10).map((e, i) =>
+    const byScore = (a: { score: number }, b: { score: number }) => b.score - a.score;
+    const rows = [...real.sort(byScore), ...standIns.sort(byScore)].slice(0, 10).map((e, i) =>
       `<tr class="${e.address === me ? "me" : ""} ${e.standIn ? "stand-in" : ""}"><td>${i + 1}.</td><td>${e.address ? explorerLink(e.address, e.name) : e.name}</td><td>${e.score}</td></tr>`).join("");
     const champs = (s.storage?.champions ?? []).slice(0, 10).map((c) =>
       `<tr class="${c.player === me ? "me" : ""}"><td>R${c.round}</td><td>${explorerLink(c.player)}</td><td>${c.score}</td></tr>`).join("");

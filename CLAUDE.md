@@ -19,7 +19,7 @@ npm run typecheck
 npm test                    # vitest, all tests (src/**/*.test.ts)
 npx vitest run src/game/sim.test.ts -t "reverses"   # single test by file and name pattern
 npm run contract:test       # contract/scripts/test-mockup.sh: originate + exercise the contract on an octez-client mockup chain
-npm run contract:deploy     # ADMIN=<alias> [ENDPOINT=…] [FEE_MUTEZ=…] [ROUND_LENGTH=<s>] contract/scripts/deploy.sh
+npm run contract:deploy     # ADMIN=<alias> [ENDPOINT=…] [FEE_MUTEZ=…] [ROUND_LENGTH=<s>, default 86400] contract/scripts/deploy.sh
 node contract/scripts/storage.ts --admin tz1…   # print the initial storage literal (used by both scripts)
 node contract/scripts/storage.ts --token-info 2 # one badge's token_info literal, for set_token_metadata
 node contract/scripts/export-badges.ts          # write the badge SVGs to public/badges/
@@ -137,8 +137,8 @@ wallet row go through `explorerLink()`: the TzKT alias when there is one, else t
 address, as a link to the account on the network's TzKT explorer (`explorer` in
 `config.ts`) opening in a new tab, with the full address in the tooltip. The leaderboard merges the round's on-chain scores with the
 stand-in entries in `src/data/leaderboard.json` (`[{ "address"?, "name", "score" }]`,
-converted from `InitialLeaderboard.md` beside it) into one table ranked by score; stand-in
-rows are dimmed (`tr.stand-in`) and a stand-in is dropped once its address holds a real
+converted from `InitialLeaderboard.md` beside it) into one table, real scores ranked first then the
+stand-ins; stand-in rows are dimmed (`tr.stand-in`) and a stand-in is dropped once its address holds a real
 ticket. Edit that file to change the list (`resolveJsonModule` is on for the import). Inputs carry `data-field` and their
 typed values survive re-renders in `Panel.drafts` (the admin's round-length box). The round
 deadline is shown as "ends in …" and refreshes with the 20 s storage poll; once passed, Buy

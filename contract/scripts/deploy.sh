@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Originate contract/tezinvaders.tz with octez-client and print the KT1 address.
-# Usage: ENDPOINT=https://rpc.shadownet.teztnets.com ADMIN=<alias> FEE_MUTEZ=1000000 ROUND_LENGTH=604800 contract/scripts/deploy.sh
-# Defaults to Shadownet and one-week rounds; pass ENDPOINT=https://rpc.tzkt.io/mainnet for Mainnet.
+# Usage: ENDPOINT=https://rpc.shadownet.teztnets.com ADMIN=<alias> FEE_MUTEZ=1000000 ROUND_LENGTH=86400 contract/scripts/deploy.sh
+# Defaults to Shadownet and one-day rounds; pass ENDPOINT=https://rpc.tzkt.io/mainnet for Mainnet.
 # Needs node for the storage generator (the token metadata carries the badge SVGs on chain, so
 # origination burns a few tez of storage; BURN_CAP defaults to 25).
 set -euo pipefail
@@ -9,7 +9,7 @@ HERE="$(cd "$(dirname "$0")" && pwd)"
 ENDPOINT="${ENDPOINT:-https://rpc.shadownet.teztnets.com}"
 ADMIN="${ADMIN:?set ADMIN to an octez-client key alias that will own the contract}"
 FEE_MUTEZ="${FEE_MUTEZ:-1000000}"
-ROUND_LENGTH="${ROUND_LENGTH:-604800}"
+ROUND_LENGTH="${ROUND_LENGTH:-86400}"
 BURN_CAP="${BURN_CAP:-25}"
 NAME="${NAME:-tezinvaders}"
 

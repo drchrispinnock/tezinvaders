@@ -17,7 +17,7 @@ const { values } = parseArgs({
   options: {
     admin: { type: "string" },
     fee: { type: "string", default: "1000000" },
-    "round-length": { type: "string", default: String(7 * 24 * 3600) },
+    "round-length": { type: "string", default: String(24 * 3600) },
     "round-ends": { type: "string" },
     "image-base": { type: "string", default: BADGE_IMAGE_BASE },
     "token-info": { type: "string" },
