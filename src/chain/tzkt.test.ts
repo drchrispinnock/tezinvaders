@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { aliasOf, clearAliasCache, resolveAliases } from "./tzkt";
+import { aliasOf, clearAliasCache, mergeLeader, resolveAliases } from "./tzkt";
 
 const reply = (body: unknown, ok = true) => ({ ok, json: async () => body }) as unknown as Response;
 
@@ -26,5 +26,15 @@ describe("resolveAliases", () => {
     const working = vi.fn(async (_url: string | URL | Request) => reply([{ address: "tz1a", alias: "boot1" }]));
     expect(await resolveAliases(["tz1a"], working)).toBe(true);
     expect(aliasOf("tz1a")).toBe("boot1");
+  });
+});
+
+describe("mergeLeader", () => {
+  it("replaces a stale indexer row with the chain's leader instead of duplicating it", () => {
+    const rows = [{ address: "tz1a", score: 500 }, { address: "tz5b", score: 0 }];
+    expect(mergeLeader(rows, { address: "tz5b", score: 280 })).toEqual([{ address: "tz1a", score: 500 }, { address: "tz5b", score: 280 }]);
+    expect(mergeLeader(rows, { address: "tz1c", score: 900 })[0]).toEqual({ address: "tz1c", score: 900 });
+    expect(mergeLeader(rows, { address: "tz1a", score: 100 })).toEqual(rows);
+    expect(mergeLeader(rows, null, 1)).toEqual([{ address: "tz1a", score: 500 }]);
   });
 });

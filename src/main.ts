@@ -1,7 +1,7 @@
 import "./polyfills";
 import { DEFAULT_NETWORK, NETWORKS, config, hasContract, networkFromPath, pathFor } from "./chain/config";
 import { buyTicket, claimAdvent, endRound, readPlayer, readStorage, setRoundLength, submitScore, type GameStorage, type ScoreEntry } from "./chain/contract";
-import { readLeaderboard, readTokenIds, resolveAliases } from "./chain/tzkt";
+import { mergeLeader, readLeaderboard, readTokenIds, resolveAliases } from "./chain/tzkt";
 import { requestAttestation } from "./chain/verifier";
 import { encodeLog } from "./game/sim";
 import { adventDay } from "./chain/advent";
@@ -101,12 +101,7 @@ async function loadStorage(): Promise<GameStorage | null> {
 
 /** This round's table from the indexer, with the on-chain leader merged in case the indexer lags. */
 async function leaderboard(leader: ScoreEntry | null): Promise<ScoreEntry[]> {
-  const rows = await readLeaderboard().catch(() => state.scores);
-  if (leader && !rows.some((r) => r.address === leader.address && r.score >= leader.score)) {
-    rows.push(leader);
-    rows.sort((a, b) => b.score - a.score || a.address.localeCompare(b.address));
-  }
-  return rows.slice(0, 10);
+  return mergeLeader(await readLeaderboard().catch(() => state.scores), leader);
 }
 
 /** Look up TzKT aliases for everyone on the boards (and the player), re-rendering if any are new. */

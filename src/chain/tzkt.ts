@@ -57,5 +57,18 @@ export async function readTokenIds(address: string, fetchFn: typeof fetch = fetc
   return new Set(ids.map(Number));
 }
 
+/**
+ * The indexer's rows with the on-chain leader merged in: the indexer lags a few seconds after a
+ * submission, so the leader's row is replaced (never duplicated) when the chain knows a higher score.
+ */
+export function mergeLeader(rows: readonly ScoreRow[], leader: ScoreRow | null, limit = 10): ScoreRow[] {
+  const byAddress = new Map(rows.map((r) => [r.address, { ...r }]));
+  if (leader) {
+    const row = byAddress.get(leader.address);
+    if (!row || row.score < leader.score) byAddress.set(leader.address, { ...leader });
+  }
+  return [...byAddress.values()].sort((a, b) => b.score - a.score || a.address.localeCompare(b.address)).slice(0, limit);
+}
+
 /** For tests. */
 export const clearAliasCache = (): void => cache.clear();
