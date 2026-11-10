@@ -119,8 +119,8 @@ which are per-cell bitmaps eroded by `eraseBlob`.
   `badgeDataUri()`, which render the game's own bitmaps to SVG. The panel draws those data
   URIs locally, so it needs no token-metadata reads. The on-chain token metadata instead
   points at hosted copies, `BADGE_IMAGE_BASE` + `<slug>.svg`: the files
-  `contract/scripts/export-badges.ts` writes to `public/badges/`, published with the site on
-  GitHub Pages. TzKT and Signet only load `ipfs://` or public https images and show a
+  `contract/scripts/export-badges.ts` writes to `public/badges/`, published with the site at
+  tezinvaders.xyz (CloudFront). TzKT and Signet only load `ipfs://` or public https images and show a
   placeholder for `data:` URIs. Thresholds must match the list `PUSH`ed in
   the contract's `submit_score`. If the images move, the admin calls `set_token_metadata`
   with the literal from `storage.ts --token-info <id>`; no redeploy needed.
@@ -181,7 +181,7 @@ position (the last five numbers of the storage print) and must follow too.
   number. The planned fix is a verifier key whose signed score attestation the contract checks.
 - Nothing calls `end_round` automatically when the deadline passes: the panel shows everyone
   the button, and `contract/scripts/end-round.sh` can be run from cron.
-- Badge pictures are hosted with the site on GitHub Pages, not on chain; if the site moves
+- Badge pictures are hosted with the site at tezinvaders.xyz, not on chain; if the site moves
   the admin repoints the tokens with `set_token_metadata` (literal from
   `storage.ts --token-info <id> --image-base <new base>`).
 - Winner takes the whole pool; no split, no rake.
