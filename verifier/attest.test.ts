@@ -81,3 +81,14 @@ describe("keysFromJson", () => {
     expect(() => keysFromJson("{}")).toThrow(/default edsk/);
   });
 });
+
+describe("post-quantum players", () => {
+  it("accepts a tz5 player and packs it as octez-client does", () => {
+    const tz5 = "tz5jcuNPWgD8b7sLNnYJnSQCy3uE5bbdGhWc";
+    const g = game(99);
+    expect(checkClaim({ chainId: "NetXhb8apwTcVhJ", contract: KT, player: tz5, score: g.score, seed: g.seed, log: g.log })).toBeNull();
+    // octez-client hash data … of type 'pair (pair chain_id address) (pair (pair address nat) timestamp)'
+    expect(attestationBytes({ chainId: "NetXhb8apwTcVhJ", contract: "KT1SoXm3n9eds9eQXRFkTUTY8cq3UvkriYmo", player: tz5, score: 60, expires: 1700000000 })).toBe(
+      "05070707070a000000049300b2fc0a0000001601c7dc25bb9521ca911b6e7430be396648a8e815b100070707070a000000160004f7e9abfb8775a825af882861d85c3fb2071a4f74003c0080c49fd50c");
+  });
+});

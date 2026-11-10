@@ -56,7 +56,8 @@ const ATTESTATION_TYPE: MichelsonType = {
   ],
 };
 
-const ADDRESS = /^(tz[1-4]|KT1)[1-9A-HJ-NP-Za-km-z]{33}$/;
+// tz5 is the post-quantum (ML-DSA) account kind, the norm on Quantumnet.
+const ADDRESS = /^(tz[1-5]|KT1)[1-9A-HJ-NP-Za-km-z]{33}$/;
 const CHAIN_ID = /^Net[1-9A-HJ-NP-Za-km-z]{12}$/;
 
 /** The bytes the contract PACKs for this claim, as hex without 0x. */
