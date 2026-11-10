@@ -1,13 +1,16 @@
 import { BeaconEvent, NetworkType, defaultEventCallbacks } from "@tezos-x/octez.connect-sdk";
 import { TezosToolkit } from "@tezos-x/octez.js";
 import { BeaconWallet } from "@tezos-x/octez.js-dapp-wallet";
-import { config, type NetworkName } from "./config";
+import { NETWORKS, config } from "./config";
 
-// Network names in networks.json are the Octez Connect NetworkType values (shadownet, tezosx-shadownet, …).
-const networkType = (name: NetworkName): NetworkType => {
-  if (!Object.values(NetworkType).includes(name as NetworkType)) throw new Error(`Octez Connect has no network type `);
-  return name as NetworkType;
-};
+// Network names in networks.json are the Octez Connect NetworkType values (shadownet, tezosx-shadownet, …),
+// unless the entry sets connectType, e.g. "custom" for a testnet the protocol has no name for: the
+// wallet then identifies the network by the RPC URL (Signet maps it onto its own entry that way).
+function connectNetwork(): { type: NetworkType; name: string; rpcUrl: string } {
+  const type = NETWORKS[config.network]?.connectType ?? config.network;
+  if (!Object.values(NetworkType).includes(type as NetworkType)) throw new Error(`Octez Connect has no network type ${type}`);
+  return { type: type as NetworkType, name: config.label, rpcUrl: config.rpcUrl };
+}
 
 /**
  * Octez Connect wallet session (the protocol formerly called Beacon). The toolkit is usable
@@ -26,7 +29,7 @@ export class Wallet {
   constructor() {
     this.provider = new BeaconWallet({
       name: "TezInvaders",
-      network: { type: networkType(config.network), rpcUrl: config.rpcUrl },
+      network: connectNetwork(),
       eventHandlers: {
         // Closing the pairing dialog is silent by default, which would leave the UI stuck on
         // "Connecting…". Wrap the abort hook so connect() can reject instead.
@@ -52,7 +55,10 @@ export class Wallet {
   /** Re-attach to a session the client persisted in local storage, unless it belongs to another network (then drop it). */
   async restore(): Promise<string | null> {
     const account = await this.provider.client.getActiveAccount();
-    if (account && account.network.type !== config.network) {
+    const expected = connectNetwork();
+    const foreign = account && (account.network.type !== expected.type ||
+      (expected.type === NetworkType.CUSTOM && (account.network.rpcUrl ?? "").replace(/\/$/, "") !== expected.rpcUrl.replace(/\/$/, "")));
+    if (account && foreign) {
       void this.provider.client.clearActiveAccount().catch(() => undefined);
       this.address = null;
       return null;

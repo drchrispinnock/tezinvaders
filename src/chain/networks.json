@@ -28,6 +28,13 @@
       "chainId": "NetXpX8WSZkAZZA", "rpcUrl": "https://rpc.ushuaianet.teztnets.com", "contractAddress": "KT1VdYt1iBceH68ogiXRJfYQA7q6JLdBHPXr",
       "tzktApi": "https://api.ushuaianet.tzkt.io", "explorer": "https://ushuaianet.tzkt.io",
       "faucet": "https://faucet.ushuaianet.teztnets.com"
+    },
+    {
+      "name": "quantumnet", "chain": "quantumnet", "layer": "l1", "label": "Quantumnet", "path": "/quantumnet",
+      "connectType": "custom",
+      "chainId": "NetXhb8apwTcVhJ", "rpcUrl": "https://quantumnet.pqpark.dal.nomadic-labs.com/rpc", "contractAddress": "",
+      "tzktApi": "https://quantumnet-tzkt.pqpark.dal.nomadic-labs.com", "explorer": "https://quantumnet-tzkt.pqpark.dal.nomadic-labs.com",
+      "faucet": "https://quantumnet-faucet.pqpark.dal.nomadic-labs.com"
     }
   ]
 }

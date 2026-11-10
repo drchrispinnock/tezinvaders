@@ -82,7 +82,8 @@ rollup's Michelson interface, which runs the same contract), `/mainnet`, `/mainn
 `/` redirects to Shadownet until Mainnet is live. The panel's network dropdown and L1 / L2
 toggle just navigate between them. Networks, RPCs and contract addresses are listed in
 `src/chain/networks.json`. To add a testnet, add an entry (its `name` must be an Octez Connect
-network type; `faucet` is optional), fund the admin alias there, and run
+network type, or set `connectType: "custom"` for a testnet Octez Connect has no name for and the
+wallet goes by the RPC URL; `faucet` is optional), fund the admin alias there, and run
 `npm run contract:deploy-network -- <name>`: it originates, waits for that network's TzKT to
 index the contract, writes the KT1 into the JSON and tells you to redeploy the site. The L1 / L2
 toggle only appears for chains that have a Tezos X entry, and `layerSwitch: false` in the JSON

@@ -45,8 +45,9 @@ rollup's Michelson interface: same contracts, same tz keys, RPCs at
 michelson.etherlink.<chain>.octez.io). The URL picks the network: `/shadownet`,
 `/shadownet/tezosx`, `/mainnet`, `/mainnet/tezosx`; `/` and unknown paths redirect to the
 `default` entry (Shadownet until Mainnet is live). Adding a testnet is one JSON entry (its
-`name` must be an Octez Connect `NetworkType` value; `faucet` is optional and shown in the
-panel) and `npm run contract:deploy-network -- <name>`, which refuses to run until the admin
+`name` must be an Octez Connect `NetworkType` value, or the entry sets `connectType: "custom"`
+and the wallet identifies the network by `rpcUrl`, as Quantumnet does, whose RPC must then match
+the wallet's own entry for it; `faucet` is optional and shown in the panel) and `npm run contract:deploy-network -- <name>`, which refuses to run until the admin
 holds tez there, originates, waits for the network's TzKT to index the KT1 and writes it into
 the JSON; then redeploy the site. `layerSwitch` in the JSON hides the L1 / L2 toggle everywhere
 when false; a chain with no L2 entry never shows it (Ushuaianet has no Etherlink). `.env` may override

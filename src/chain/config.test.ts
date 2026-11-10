@@ -16,11 +16,13 @@ describe("networks", () => {
     expect(networkFromPath("/nonsense")).toBeUndefined();
     expect(NETWORKS[DEFAULT_NETWORK]).toBeDefined();
     expect(CHAINS.find((c) => c.name === "shadownet")?.hasL2).toBe(true);
+    expect(CHAINS.find((c) => c.name === "ushuaianet")?.hasL2).toBe(false);
   });
 
   it("names Octez Connect network types and has what the verifier and indexer need", () => {
     for (const n of NETWORK_LIST) {
       expect(n.name).toMatch(/^(tezosx-)?[a-z]+$/);
+      if (n.connectType) expect(n.connectType).toBe("custom");
       expect(n.chainId).toMatch(/^Net[1-9A-HJ-NP-Za-km-z]{12}$/);
       expect(n.rpcUrl).toMatch(/^https:\/\//);
       expect(n.tzktApi).toMatch(/^https:\/\//);

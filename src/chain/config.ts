@@ -16,6 +16,8 @@ export interface Network {
   readonly name: NetworkName;
   readonly chain: Chain;
   readonly layer: Layer;
+  /** Octez Connect network type when it differs from `name`: "custom" for a testnet the protocol has no name for (the wallet then goes by `rpcUrl`). */
+  readonly connectType?: string;
   readonly label: string;
   /** Where the site serves this network, e.g. `/shadownet/tezosx`. */
   readonly path: string;
