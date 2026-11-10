@@ -1,118 +1,87 @@
-// Which Tezos network the app talks to: a chain (Shadownet, the test network, or Mainnet)
-// on a layer (L1, or L2: Tezos X, the Etherlink rollup's Michelson interface, which takes the
-// same contracts and the same tz1/2/3 keys). Shadownet L1 is the default; the panel has a
-// toggle for each axis and the choice is kept in localStorage. Every combination has its own
-// RPC and contract address, overridable from `.env`.
+// Which Tezos network the app talks to. The URL decides: `/shadownet` is Shadownet L1,
+// `/shadownet/tezosx` is Tezos X on Shadownet (the Etherlink rollup's Michelson interface,
+// same contract and keys), `/mainnet` and `/mainnet/tezosx` likewise, and `/` sends the
+// visitor to the default. The table lives in networks.json (one entry per chain × layer,
+// all public information: chain id, RPC, contract, indexer, explorer) so adding a testnet is
+// one JSON entry plus an origination; `.env` may override a contract address for local work.
 
-export type Chain = "shadownet" | "mainnet";
+import table from "./networks.json";
+
+export type Chain = string;
 export type Layer = "l1" | "l2";
-export type NetworkName = "shadownet" | "mainnet" | "tezosx-shadownet" | "tezosx-mainnet";
+/** Also the Octez Connect NetworkType value (`shadownet`, `tezosx-shadownet`, …). */
+export type NetworkName = string;
 
 export interface Network {
   readonly name: NetworkName;
   readonly chain: Chain;
   readonly layer: Layer;
   readonly label: string;
-  readonly rpcUrl: string;
-  readonly contractAddress: string;
+  /** Where the site serves this network, e.g. `/shadownet/tezosx`. */
+  readonly path: string;
   /** The chain id the verifier binds attestations to (NetX…). */
   readonly chainId: string;
-  /** TzKT API root for account aliases on the leaderboards (Etherlink TzKT covers the Michelson side too). */
+  readonly rpcUrl: string;
+  readonly contractAddress: string;
+  /** TzKT API root (account aliases, the scores big map). */
   readonly tzktApi: string;
-  /** TzKT block explorer root (accounts at `<root>/<address>`). */
+  /** TzKT block explorer root; accounts at `<root>/<address>`. */
   readonly explorer: string;
+  readonly faucet?: string;
 }
 
 const env = import.meta.env;
 
-export const NETWORKS: Readonly<Record<NetworkName, Network>> = {
-  shadownet: {
-    name: "shadownet", chain: "shadownet", layer: "l1",
-    label: "Shadownet",
-    rpcUrl: env.VITE_RPC_URL_SHADOWNET ?? "https://rpc.shadownet.teztnets.com",
-    contractAddress: env.VITE_CONTRACT_ADDRESS_SHADOWNET ?? "",
-    chainId: "NetXsqzbfFenSTS",
-    tzktApi: "https://api.shadownet.tzkt.io",
-    explorer: "https://shadownet.tzkt.io",
-  },
-  mainnet: {
-    name: "mainnet", chain: "mainnet", layer: "l1",
-    label: "Mainnet",
-    rpcUrl: env.VITE_RPC_URL_MAINNET ?? "https://rpc.tzkt.io/mainnet",
-    contractAddress: env.VITE_CONTRACT_ADDRESS_MAINNET ?? "",
-    chainId: "NetXdQprcVkpaWU",
-    tzktApi: "https://api.tzkt.io",
-    explorer: "https://tzkt.io",
-  },
-  "tezosx-shadownet": {
-    name: "tezosx-shadownet", chain: "shadownet", layer: "l2",
-    label: "Tezos X Shadownet",
-    rpcUrl: env.VITE_RPC_URL_TEZOSX_SHADOWNET ?? "https://michelson.etherlink.shadownet.octez.io",
-    contractAddress: env.VITE_CONTRACT_ADDRESS_TEZOSX_SHADOWNET ?? "",
-    chainId: "NetXtLrzvQDobza",
-    tzktApi: "https://api.shadownet.etherlink.tzkt.io",
-    explorer: "https://shadownet.etherlink.tzkt.io",
-  },
-  "tezosx-mainnet": {
-    name: "tezosx-mainnet", chain: "mainnet", layer: "l2",
-    label: "Tezos X Mainnet",
-    rpcUrl: env.VITE_RPC_URL_TEZOSX_MAINNET ?? "https://michelson.etherlink.mainnet.octez.io",
-    contractAddress: env.VITE_CONTRACT_ADDRESS_TEZOSX_MAINNET ?? "",
-    chainId: "NetXohUVN5QWR4f",
-    tzktApi: "https://api.etherlink.tzkt.io",
-    explorer: "https://etherlink.tzkt.io",
-  },
-};
+/** Every configured network, in the order of networks.json. */
+export const NETWORK_LIST: readonly Network[] = (table.networks as Network[]).map((n) => ({
+  ...n,
+  contractAddress: env[`VITE_CONTRACT_ADDRESS_${n.name.toUpperCase().replace("-", "_")}`] || n.contractAddress,
+}));
+export const NETWORKS: Readonly<Record<NetworkName, Network>> = Object.fromEntries(NETWORK_LIST.map((n) => [n.name, n]));
+export const DEFAULT_NETWORK: NetworkName = table.default;
 
-export const CHAINS: readonly { name: Chain; label: string }[] = [
-  { name: "shadownet", label: "Shadownet" },
-  { name: "mainnet", label: "Mainnet" },
-];
+/** The chains with their labels, L1 first in the table; and whether each has an L2. */
+export const CHAINS: readonly { name: Chain; label: string; hasL2: boolean }[] = NETWORK_LIST
+  .filter((n) => n.layer === "l1")
+  .map((n) => ({ name: n.chain, label: n.label, hasL2: NETWORK_LIST.some((m) => m.chain === n.chain && m.layer === "l2") }));
 export const LAYERS: readonly { name: Layer; label: string; title: string }[] = [
   { name: "l1", label: "L1", title: "Tezos layer 1" },
   { name: "l2", label: "L2", title: "Tezos X (Etherlink)" },
 ];
 
-export const DEFAULT_NETWORK: NetworkName = "shadownet";
-const STORAGE_KEY = "tezinvaders.network";
-
-export function isNetworkName(x: unknown): x is NetworkName {
-  return typeof x === "string" && x in NETWORKS;
-}
-export const isChain = (x: unknown): x is Chain => x === "shadownet" || x === "mainnet";
+export const isNetworkName = (x: unknown): x is NetworkName => typeof x === "string" && x in NETWORKS;
 export const isLayer = (x: unknown): x is Layer => x === "l1" || x === "l2";
 
-/** The network for a chain/layer pair. */
-export const networkFor = (chain: Chain, layer: Layer): NetworkName =>
-  layer === "l1" ? chain : `tezosx-${chain}`;
+/** The network for a chain/layer pair, or undefined when that combination is not configured. */
+export const networkFor = (chain: Chain, layer: Layer): NetworkName | undefined =>
+  NETWORK_LIST.find((n) => n.chain === chain && n.layer === layer)?.name;
 
-/** The network chosen in this browser, falling back to the default. */
-export function currentNetwork(): NetworkName {
-  try {
-    const stored = localStorage.getItem(STORAGE_KEY);
-    if (isNetworkName(stored)) return stored;
-  } catch { /* storage unavailable */ }
-  return DEFAULT_NETWORK;
+/** The network a path names (`/shadownet`, `/shadownet/tezosx/`, …), or undefined. */
+export function networkFromPath(pathname: string): NetworkName | undefined {
+  const path = "/" + pathname.split("/").filter(Boolean).join("/");
+  return NETWORK_LIST.find((n) => n.path === path)?.name;
 }
 
-/** Persist the choice. Callers reload the page afterwards: the wallet and toolkit are bound to one network. */
-export function setNetwork(name: NetworkName): void {
-  try { localStorage.setItem(STORAGE_KEY, name); } catch { /* storage unavailable */ }
+export const pathFor = (name: NetworkName): string => NETWORKS[name]?.path ?? NETWORKS[DEFAULT_NETWORK]!.path;
+
+/** The network this page is for, from its URL; the default when the URL names none (main.ts then redirects). */
+export function currentNetwork(): NetworkName {
+  try { return networkFromPath(location.pathname) ?? DEFAULT_NETWORK; } catch { return DEFAULT_NETWORK; }
 }
 
 /** The active network's settings, resolved at access time. */
 export const config = {
   get network(): NetworkName { return currentNetwork(); },
-  get chain(): Chain { return NETWORKS[currentNetwork()].chain; },
-  get layer(): Layer { return NETWORKS[currentNetwork()].layer; },
-  get label(): string { return NETWORKS[currentNetwork()].label; },
-  get rpcUrl(): string { return NETWORKS[currentNetwork()].rpcUrl; },
-  get contractAddress(): string { return NETWORKS[currentNetwork()].contractAddress; },
-  get chainId(): string { return NETWORKS[currentNetwork()].chainId; },
-  get tzktApi(): string { return NETWORKS[currentNetwork()].tzktApi; },
-  get explorer(): string { return NETWORKS[currentNetwork()].explorer; },
-  /** The `.env` variable suffix for the active network, e.g. `TEZOSX_SHADOWNET`. */
-  get envSuffix(): string { return currentNetwork().toUpperCase().replace("-", "_"); },
+  get chain(): Chain { return NETWORKS[currentNetwork()]!.chain; },
+  get layer(): Layer { return NETWORKS[currentNetwork()]!.layer; },
+  get label(): string { return NETWORKS[currentNetwork()]!.label; },
+  get path(): string { return NETWORKS[currentNetwork()]!.path; },
+  get rpcUrl(): string { return NETWORKS[currentNetwork()]!.rpcUrl; },
+  get contractAddress(): string { return NETWORKS[currentNetwork()]!.contractAddress; },
+  get chainId(): string { return NETWORKS[currentNetwork()]!.chainId; },
+  get tzktApi(): string { return NETWORKS[currentNetwork()]!.tzktApi; },
+  get explorer(): string { return NETWORKS[currentNetwork()]!.explorer; },
+  get faucet(): string | undefined { return NETWORKS[currentNetwork()]!.faucet; },
   /** The score verifier (verifier/server.ts or lambda.ts), one for every network; empty when none is configured. */
   get verifierUrl(): string { return (env.VITE_VERIFIER_URL ?? "").replace(/\/$/, ""); },
 };

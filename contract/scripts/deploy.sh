@@ -22,4 +22,4 @@ octez-client -E "$ENDPOINT" -w "$WAIT" originate contract "$NAME" transferring 0
   running "$HERE/../tezinvaders.tz" \
   --init "$init" --burn-cap "$BURN_CAP" --force
 echo
-echo "Put the KT1 address above into .env as VITE_CONTRACT_ADDRESS_SHADOWNET (or _MAINNET if you deployed there)."
+echo "Put the KT1 address above into src/chain/networks.json as that network's contractAddress."

@@ -1,5 +1,5 @@
 import { BADGES, badgeDataUri, badgeFor } from "../chain/badges";
-import { CHAINS, LAYERS, config, formatTez, hasContract, isChain, isLayer, networkFor, shortAddress, type NetworkName } from "../chain/config";
+import { CHAINS, DEFAULT_NETWORK, LAYERS, config, formatTez, hasContract, isLayer, networkFor, pathFor, shortAddress, type NetworkName } from "../chain/config";
 import { roundOver, type GameStorage, type PlayerState, type ScoreEntry } from "../chain/contract";
 import type { GameRecord } from "../chain/verifier";
 import { aliasOf } from "../chain/tzkt";
@@ -64,13 +64,20 @@ export class Panel {
       const field = (e.target as HTMLInputElement).dataset.field;
       if (field) this.drafts[field] = (e.target as HTMLInputElement).value;
     });
+    root.addEventListener("change", (e) => {
+      const select = (e.target as HTMLElement).closest<HTMLSelectElement>("select[data-chain]");
+      if (!select) return;
+      // Keep the layer when the new chain has it, else fall back to L1.
+      const target = networkFor(select.value, config.layer) ?? networkFor(select.value, "l1");
+      if (target && target !== config.network) this.actions.switchNetwork(target);
+    });
     root.addEventListener("click", (e) => {
-      const btn = (e.target as HTMLElement).closest<HTMLButtonElement>("button[data-action], button[data-chain], button[data-layer]");
+      const btn = (e.target as HTMLElement).closest<HTMLButtonElement>("button[data-action], button[data-layer]");
       if (!btn || btn.disabled) return;
-      const { chain, layer } = btn.dataset;
-      if (chain !== undefined || layer !== undefined) {
-        const target = networkFor(isChain(chain) ? chain : config.chain, isLayer(layer) ? layer : config.layer);
-        if (target !== config.network) this.actions.switchNetwork(target);
+      const { layer } = btn.dataset;
+      if (layer !== undefined) {
+        const target = isLayer(layer) ? networkFor(config.chain, layer) : undefined;
+        if (target && target !== config.network) this.actions.switchNetwork(target);
         return;
       }
       const action = btn.dataset.action as Exclude<keyof PanelActions, "switchNetwork">;
@@ -91,22 +98,25 @@ export class Panel {
     const over = s.storage ? roundOver(s.storage) : false;
     const dis = s.busy ? "disabled" : "";
 
+    const hasL2 = CHAINS.find((c) => c.name === config.chain)?.hasL2 ?? false;
     const networkHtml = `<div class="segs">
-      <div class="seg" role="group" aria-label="Network">${CHAINS.map((c) =>
-        `<button data-chain="${c.name}" class="${c.name === config.chain ? "on" : ""}" ${dis} aria-pressed="${c.name === config.chain}">${c.label}</button>`).join("")}</div>
+      <select data-chain aria-label="Network" ${dis}>${CHAINS.map((c) =>
+        `<option value="${c.name}" ${c.name === config.chain ? "selected" : ""}>${c.label}</option>`).join("")}</select>
       <div class="seg" role="group" aria-label="Layer">${LAYERS.map((l) =>
-        `<button data-layer="${l.name}" class="${l.name === config.layer ? "on" : ""}" ${dis} aria-pressed="${l.name === config.layer}" title="${l.title}">${l.label}</button>`).join("")}</div></div>`;
+        `<button data-layer="${l.name}" class="${l.name === config.layer ? "on" : ""}" ${dis} ${l.name === "l2" && !hasL2 ? "disabled" : ""} aria-pressed="${l.name === config.layer}" title="${l.name === "l2" && !hasL2 ? `No Tezos X on ${config.label}` : l.title}">${l.label}</button>`).join("")}</div></div>`;
 
     const walletHtml = me
       ? `<div class="row"><span class="addr">${explorerLink(me)}</span>
            <button class="secondary" data-action="disconnect" ${dis}>Disconnect</button></div>`
-      : `<div class="row"><span class="muted">Not connected</span>
+      : `<div class="row"><span class="muted">Not connected${config.faucet ? ` · <a href="${config.faucet}" target="_blank" rel="noopener">faucet</a>` : ""}</span>
            <button data-action="connect" ${dis}>Connect wallet</button></div>`;
 
     let poolHtml: string;
     if (!hasContract()) {
-      poolHtml = `<p class="muted">No contract configured on ${config.label}. Free play only.<br>
-        Deploy <code>contract/tezinvaders.tz</code> and set <code>VITE_CONTRACT_ADDRESS_${config.envSuffix}</code>.</p>`;
+      poolHtml = config.network !== DEFAULT_NETWORK
+        ? `<p class="muted">${config.label} is coming soon. Free play here; <a href="${pathFor(DEFAULT_NETWORK)}">play for the prize pool on Shadownet</a>.</p>`
+        : `<p class="muted">No contract configured on ${config.label}. Free play only.<br>
+        Deploy <code>contract/tezinvaders.tz</code> and put the KT1 into <code>src/chain/networks.json</code>.</p>`;
     } else if (!s.storage) {
       poolHtml = `<p class="muted">Loading ${shortAddress(config.contractAddress)}…</p>`;
     } else {

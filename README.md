@@ -20,7 +20,7 @@ is free play and the side panel just says so.
 npm run contract:test                          # exercise contract/tezinvaders.tz on a local mockup chain
 npm run verifier:keygen                         # the verifier key pair (see Score verification)
 ADMIN=my-alias VERIFIER=edpk… npm run contract:deploy   # originate on Shadownet with octez-client; prints the KT1
-cp .env.example .env                           # then set VITE_CONTRACT_ADDRESS_SHADOWNET to that KT1
+cp .env.example .env                           # verifier URL; put the KT1 into src/chain/networks.json
 npm run dev
 ```
 
@@ -77,11 +77,13 @@ Build-time config lives in the committed `.env.production`.
 The badge token metadata on chain names the image URL, so after choosing a host repoint the
 five tokens with `set_token_metadata` (see `CLAUDE.md`).
 
-The panel has a Shadownet / Mainnet toggle and an L1 / L2 toggle; Shadownet L1 is the default.
-L2 is Tezos X, the Etherlink rollup's Michelson interface, which runs the same contract. Each
-combination has its own contract address in `.env` (`VITE_CONTRACT_ADDRESS_MAINNET`,
-`VITE_CONTRACT_ADDRESS_TEZOSX_SHADOWNET`, …), deployed with the matching `ENDPOINT=` (for
-example `https://rpc.tzkt.io/mainnet` or `https://michelson.etherlink.shadownet.octez.io`).
+Each network has its own URL: `/shadownet`, `/shadownet/tezosx` (Tezos X, the Etherlink
+rollup's Michelson interface, which runs the same contract), `/mainnet`, `/mainnet/tezosx`;
+`/` redirects to Shadownet until Mainnet is live. The panel's network dropdown and L1 / L2
+toggle just navigate between them. Networks, RPCs and contract addresses are listed in
+`src/chain/networks.json`; to add one, originate with the matching `ENDPOINT=` (for example
+`https://rpc.tzkt.io/mainnet` or `https://michelson.etherlink.shadownet.octez.io`) and add an
+entry (its `name` must be an Octez Connect network type).
 To fund the admin on Tezos X, bridge tez from L1: a transfer to the network's bridge helper
 (Shadownet `KT19aBsSWvWtvEkbiqReJnD8UzQMWcD8SHUD`, rollup `sr19fMYrr5C4qqvQqQrDSjtP31GcrWjodzvg`)
 calling `deposit` with the rollup address and the RLP routing data for the tz1 receiver; Signet's

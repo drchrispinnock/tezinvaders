@@ -3,11 +3,10 @@ import { TezosToolkit } from "@tezos-x/octez.js";
 import { BeaconWallet } from "@tezos-x/octez.js-dapp-wallet";
 import { config, type NetworkName } from "./config";
 
-const NETWORK_TYPES: Record<NetworkName, NetworkType> = {
-  shadownet: NetworkType.SHADOWNET,
-  mainnet: NetworkType.MAINNET,
-  "tezosx-shadownet": NetworkType.TEZOSX_SHADOWNET,
-  "tezosx-mainnet": NetworkType.TEZOSX_MAINNET,
+// Network names in networks.json are the Octez Connect NetworkType values (shadownet, tezosx-shadownet, …).
+const networkType = (name: NetworkName): NetworkType => {
+  if (!Object.values(NetworkType).includes(name as NetworkType)) throw new Error(`Octez Connect has no network type `);
+  return name as NetworkType;
 };
 
 /**
@@ -27,7 +26,7 @@ export class Wallet {
   constructor() {
     this.provider = new BeaconWallet({
       name: "TezInvaders",
-      network: { type: NETWORK_TYPES[config.network], rpcUrl: config.rpcUrl },
+      network: { type: networkType(config.network), rpcUrl: config.rpcUrl },
       eventHandlers: {
         // Closing the pairing dialog is silent by default, which would leave the UI stuck on
         // "Connecting…". Wrap the abort hook so connect() can reject instead.

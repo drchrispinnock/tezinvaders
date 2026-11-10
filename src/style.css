@@ -28,6 +28,9 @@ canvas:focus { border-color: var(--tez); }
 .panel .seg button { background: transparent; color: var(--muted); border: 0; border-radius: 0; padding: 4px 10px; font-size: 11px; letter-spacing: 1px; text-transform: uppercase; }
 .panel .seg button + button { border-left: 1px solid var(--line); }
 .panel .seg button.on { background: var(--tez); color: #fff; }
+.panel select { font: inherit; font-size: 11px; letter-spacing: 1px; text-transform: uppercase; background: var(--tez); color: #fff; border: 1px solid var(--line); border-radius: 3px; padding: 4px 6px; }
+body.l2 .panel select { background: var(--gold); color: #111; }
+.panel .muted a, .panel .status a { color: var(--tez); }
 body.l2 canvas, body.l2 .panel { border-color: #6b5a1f; }
 body.l2 canvas:focus { border-color: var(--gold); }
 body.l2 .panel .seg button.on { background: var(--gold); color: #111; }

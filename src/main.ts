@@ -1,5 +1,5 @@
 import "./polyfills";
-import { config, hasContract, setNetwork } from "./chain/config";
+import { DEFAULT_NETWORK, config, hasContract, networkFromPath, pathFor } from "./chain/config";
 import { buyTicket, endRound, readPlayer, readStorage, setRoundLength, submitScore, type GameStorage, type ScoreEntry } from "./chain/contract";
 import { readLeaderboard, resolveAliases } from "./chain/tzkt";
 import { requestAttestation } from "./chain/verifier";
@@ -10,6 +10,13 @@ import { Game } from "./game/Game";
 import { Panel, type PanelState } from "./ui/panel";
 
 const POLL_MS = 20_000;
+
+// The URL names the network (/shadownet, /shadownet/tezosx, …). Anything else goes to the default.
+if (!networkFromPath(location.pathname)) {
+  location.replace(pathFor(DEFAULT_NETWORK) + location.search + location.hash);
+} else if (location.pathname !== config.path) {
+  history.replaceState(null, "", config.path + location.search + location.hash);
+}
 
 const canvas = document.getElementById("game") as HTMLCanvasElement;
 const panelRoot = document.getElementById("panel") as HTMLElement;
@@ -140,11 +147,11 @@ const panel = new Panel(panelRoot, {
     await loadStorage();
     return hash;
   }),
-  // The wallet and toolkit are bound to one network, so switching drops the session and reloads.
+  // Each network is its own page: the wallet and toolkit are bound to one network, so switching
+  // drops the session and navigates to that network's URL.
   switchNetwork: (name) => run(`Switching to ${name}`, async () => {
     await wallet.disconnect().catch(() => undefined);
-    setNetwork(name);
-    location.reload();
+    location.assign(pathFor(name));
   }),
 });
 

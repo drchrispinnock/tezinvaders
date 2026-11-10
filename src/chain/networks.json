@@ -1,0 +1,26 @@
+{
+  "default": "shadownet",
+  "networks": [
+    {
+      "name": "mainnet", "chain": "mainnet", "layer": "l1", "label": "Mainnet", "path": "/mainnet",
+      "chainId": "NetXdQprcVkpaWU", "rpcUrl": "https://rpc.tzkt.io/mainnet", "contractAddress": "",
+      "tzktApi": "https://api.tzkt.io", "explorer": "https://tzkt.io"
+    },
+    {
+      "name": "tezosx-mainnet", "chain": "mainnet", "layer": "l2", "label": "Tezos X Mainnet", "path": "/mainnet/tezosx",
+      "chainId": "NetXohUVN5QWR4f", "rpcUrl": "https://michelson.etherlink.mainnet.octez.io", "contractAddress": "",
+      "tzktApi": "https://api.etherlink.tzkt.io", "explorer": "https://etherlink.tzkt.io"
+    },
+    {
+      "name": "shadownet", "chain": "shadownet", "layer": "l1", "label": "Shadownet", "path": "/shadownet",
+      "chainId": "NetXsqzbfFenSTS", "rpcUrl": "https://rpc.shadownet.teztnets.com", "contractAddress": "KT1FE9ZzhwF4gfiroNqvFAVa6TBpzuM1zixe",
+      "tzktApi": "https://api.shadownet.tzkt.io", "explorer": "https://shadownet.tzkt.io",
+      "faucet": "https://faucet.shadownet.teztnets.com"
+    },
+    {
+      "name": "tezosx-shadownet", "chain": "shadownet", "layer": "l2", "label": "Tezos X Shadownet", "path": "/shadownet/tezosx",
+      "chainId": "NetXtLrzvQDobza", "rpcUrl": "https://michelson.etherlink.shadownet.octez.io", "contractAddress": "KT1NF4YLSaEoALXBbAVJKwznKeo2Eh9QPg2D",
+      "tzktApi": "https://api.shadownet.etherlink.tzkt.io", "explorer": "https://shadownet.etherlink.tzkt.io"
+    }
+  ]
+}

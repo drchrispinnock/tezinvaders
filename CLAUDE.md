@@ -38,17 +38,20 @@ it afterwards, or `PROTOCOL=<hash>` to pin a protocol instead of the client's de
 mockup chain's `NOW` is stuck at the epoch, so deadline tests originate with explicit
 `--round-ends` values.
 
-Runtime config comes from `.env` (see `.env.example`): per network, `VITE_RPC_URL_<NET>` and
-`VITE_CONTRACT_ADDRESS_<NET>` for `SHADOWNET`, `MAINNET`, `TEZOSX_SHADOWNET` and
-`TEZOSX_MAINNET` (the last two are Tezos X, the Etherlink rollup's Michelson interface: same
-contracts, same tz keys, RPCs at michelson.etherlink.<chain>.octez.io). Deploying there: fund the
+Networks live in `src/chain/networks.json`: one entry per chain × layer with its URL path,
+chain id, RPC, contract address, TzKT API and explorer (Tezos X entries are the Etherlink
+rollup's Michelson interface: same contracts, same tz keys, RPCs at
+michelson.etherlink.<chain>.octez.io). The URL picks the network: `/shadownet`,
+`/shadownet/tezosx`, `/mainnet`, `/mainnet/tezosx`; `/` and unknown paths redirect to the
+`default` entry (Shadownet until Mainnet is live). Adding a testnet is one JSON entry (its
+`name` must be an Octez Connect `NetworkType` value) plus an origination. `.env` may override
+a contract address (`VITE_CONTRACT_ADDRESS_<NAME>`) for local work and holds the verifier URL. Deploying there: fund the
 admin by bridging from L1 (see README), originate with `ENDPOINT=<L2 rpc>`; octez-client hangs
 waiting for the confirmation, so stop it and read the KT1 from api.<chain>.etherlink.tzkt.io.
-Storage burn on L2 is negligible. `.env.production` is committed
-(the values are public) and is what `vite build` uses. The panel has a Shadownet / Mainnet
-toggle and an L1 / L2 toggle (a `Chain` and a `Layer`, combined by `networkFor()` into one of
-the four `NetworkName`s), Shadownet L1 by default, persisted in `localStorage`; switching disconnects the wallet and
-reloads the page because the Octez Connect client and toolkit are bound to one network. (Ghostnet no
+Storage burn on L2 is negligible. `.env.production` is committed and holds only `VITE_VERIFIER_URL`. The panel has a network
+dropdown and an L1 / L2 toggle (a `Chain` and a `Layer`, combined by `networkFor()` into a
+`NetworkName`); choosing one disconnects the wallet and navigates to that network's path,
+because the Octez Connect client and toolkit are bound to one network per page. (Ghostnet no
 longer exists.) With no valid KT1 address for the active network the panel says so and the game
 is free play only.
 
@@ -60,9 +63,11 @@ One static target:
   Origin Access Control and a security-headers policy; no CSP yet, because Octez Connect
   pairing talks to relay hosts that would need listing). `deploy/aws-deploy.sh`
   (`npm run deploy:aws`) builds, syncs `dist/` with long cache headers on `assets/` and
-  revalidation on the rest, and invalidates the distribution (the user's `homes3` profile is
-  S3-only, so that last step is refused and they invalidate by hand). The site is served from `/`,
-  so no base path.
+  revalidation on the rest, uploads a copy of `index.html` under every network path from
+  `networks.json` (with and without a trailing slash, since CloudFront's default root object only
+  covers `/` and the distribution has no rewrite rule), and invalidates the distribution (the
+  user's `homes3` profile is S3-only, so that last step is refused and they invalidate by hand).
+  The site is served from `/`, so no base path.
 - Vite's `base` still follows `BASE_PATH`, and anything that builds a URL in code goes through
   `import.meta.env.BASE_URL` (see the panel's logo), so the site can be served under a path
   prefix if it ever needs to be. The GitHub Pages workflow was removed: tezinvaders.xyz is the
