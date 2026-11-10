@@ -1,7 +1,7 @@
 import { defineConfig } from "vitest/config";
 
 export default defineConfig({
-  // GitHub Pages serves the site under /tezinvaders/; the Pages workflow sets BASE_PATH.
+  // BASE_PATH lets the site be served under a path prefix (unused by the CloudFront deployment).
   // Locally the default "/" keeps http://localhost:5173/ working.
   base: process.env.BASE_PATH ?? "/",
   // The Octez Connect SDK still reaches for Node's `global` in a few places.

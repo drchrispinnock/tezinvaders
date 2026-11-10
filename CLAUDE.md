@@ -45,7 +45,7 @@ contracts, same tz keys, RPCs at michelson.etherlink.<chain>.octez.io). Deployin
 admin by bridging from L1 (see README), originate with `ENDPOINT=<L2 rpc>`; octez-client hangs
 waiting for the confirmation, so stop it and read the KT1 from api.<chain>.etherlink.tzkt.io.
 Storage burn on L2 is negligible. `.env.production` is committed
-(the values are public) and is what `vite build` and the Pages workflow use. The panel has a Shadownet / Mainnet
+(the values are public) and is what `vite build` uses. The panel has a Shadownet / Mainnet
 toggle and an L1 / L2 toggle (a `Chain` and a `Layer`, combined by `networkFor()` into one of
 the four `NetworkName`s), Shadownet L1 by default, persisted in `localStorage`; switching disconnects the wallet and
 reloads the page because the Octez Connect client and toolkit are bound to one network. (Ghostnet no
@@ -54,7 +54,7 @@ is free play only.
 
 ## Hosting
 
-Two targets, both static:
+One static target:
 
 - **AWS**: `deploy/aws-site.yml` (CloudFormation: private S3 bucket + CloudFront with an
   Origin Access Control and a security-headers policy; no CSP yet, because Octez Connect
@@ -63,10 +63,10 @@ Two targets, both static:
   revalidation on the rest, and invalidates the distribution (the user's `homes3` profile is
   S3-only, so that last step is refused and they invalidate by hand). The site is served from `/`,
   so no base path.
-- **GitHub Pages**: `.github/workflows/pages.yml` builds on every push to `main` with
-  `BASE_PATH=/tezinvaders/` so Vite emits prefixed URLs; locally the base stays `/`.
-  Anything that builds a URL in code must go through `import.meta.env.BASE_URL` (see the
-  panel's logo). Pages has to be enabled once with "GitHub Actions" as the source.
+- Vite's `base` still follows `BASE_PATH`, and anything that builds a URL in code goes through
+  `import.meta.env.BASE_URL` (see the panel's logo), so the site can be served under a path
+  prefix if it ever needs to be. The GitHub Pages workflow was removed: tezinvaders.xyz is the
+  one deployment.
 
 Badge images ship with the site from `public/badges/`; `BADGE_IMAGE_BASE` in
 `src/chain/badges.ts` and the token metadata on chain must name whichever host is live
