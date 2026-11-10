@@ -25,7 +25,7 @@
     },
     {
       "name": "ushuaianet", "chain": "ushuaianet", "layer": "l1", "label": "Ushuaianet", "path": "/ushuaianet",
-      "chainId": "NetXpX8WSZkAZZA", "rpcUrl": "https://rpc.ushuaianet.teztnets.com", "contractAddress": "",
+      "chainId": "NetXpX8WSZkAZZA", "rpcUrl": "https://rpc.ushuaianet.teztnets.com", "contractAddress": "KT1VdYt1iBceH68ogiXRJfYQA7q6JLdBHPXr",
       "tzktApi": "https://api.ushuaianet.tzkt.io", "explorer": "https://ushuaianet.tzkt.io",
       "faucet": "https://faucet.ushuaianet.teztnets.com"
     }

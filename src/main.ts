@@ -1,5 +1,5 @@
 import "./polyfills";
-import { DEFAULT_NETWORK, config, hasContract, networkFromPath, pathFor } from "./chain/config";
+import { DEFAULT_NETWORK, NETWORKS, config, hasContract, networkFromPath, pathFor } from "./chain/config";
 import { buyTicket, endRound, readPlayer, readStorage, setRoundLength, submitScore, type GameStorage, type ScoreEntry } from "./chain/contract";
 import { readLeaderboard, resolveAliases } from "./chain/tzkt";
 import { requestAttestation } from "./chain/verifier";
@@ -22,7 +22,7 @@ const canvas = document.getElementById("game") as HTMLCanvasElement;
 const panelRoot = document.getElementById("panel") as HTMLElement;
 
 const wallet = new Wallet();
-const state: PanelState = { address: null, storage: null, scores: [], badges: null, busy: false, status: "", error: false, pendingScore: null, pendingGame: null };
+const state: PanelState = { address: null, storage: null, scores: [], badges: null, busy: false, status: "", error: false, pendingScore: null, pendingGame: null, switching: null };
 
 const game = new Game(canvas, (e) => {
   if (e.type === "start") state.pendingScore = null;
@@ -148,11 +148,14 @@ const panel = new Panel(panelRoot, {
     return hash;
   }),
   // Each network is its own page: the wallet and toolkit are bound to one network, so switching
-  // drops the session and navigates to that network's URL.
-  switchNetwork: (name) => run(`Switching to ${name}`, async () => {
-    await wallet.disconnect().catch(() => undefined);
+  // navigates to that network's URL at once. The wallet session is not torn down here (that takes
+  // seconds); the new page drops a session that belongs to another network (Wallet.restore).
+  switchNetwork: (name) => {
+    state.busy = true;
+    state.switching = NETWORKS[name]?.label ?? name;
+    setStatus(`Switching to ${state.switching}…`);
     location.assign(pathFor(name));
-  }),
+  },
 });
 
 wallet.onAccountChange = (address) => { state.address = address; state.badges = null; refreshPanel(); void loadStorage(); };

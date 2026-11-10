@@ -22,6 +22,8 @@ canvas:focus { border-color: var(--tez); }
 .panel h1 .logo { width: 18px; height: 24px; }
 .panel h1 .x { font-size: 9px; color: var(--gold); margin-left: -8px; align-self: flex-start; line-height: 1; }
 .panel .segs { display: flex; gap: 6px; }
+.panel .banner { background: var(--tez); color: #fff; text-align: center; padding: 8px; border-radius: 3px; font-size: 12px; letter-spacing: 1px; text-transform: uppercase; }
+body.l2 .panel .banner { background: var(--gold); color: #111; }
 .panel h2 { font-size: 11px; text-transform: uppercase; letter-spacing: 2px; color: var(--muted); margin: 0 0 8px; }
 .panel .row > h2 { margin: 0; }
 .panel .seg { display: inline-flex; border: 1px solid var(--line); border-radius: 3px; overflow: hidden; }

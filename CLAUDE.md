@@ -55,8 +55,10 @@ admin by bridging from L1 (see README), originate with `ENDPOINT=<L2 rpc>`; octe
 waiting for the confirmation, so stop it and read the KT1 from api.<chain>.etherlink.tzkt.io.
 Storage burn on L2 is negligible. `.env.production` is committed and holds only `VITE_VERIFIER_URL`. The panel has a network
 dropdown and an L1 / L2 toggle (a `Chain` and a `Layer`, combined by `networkFor()` into a
-`NetworkName`); choosing one disconnects the wallet and navigates to that network's path,
-because the Octez Connect client and toolkit are bound to one network per page. (Ghostnet no
+`NetworkName`); choosing one navigates to that network's path at once (a banner says so), because the Octez
+Connect client and toolkit are bound to one network per page. The session is not torn down
+first, since that takes seconds: `Wallet.restore()` on the new page drops a persisted session
+whose network differs from the page's. (Ghostnet no
 longer exists.) With no valid KT1 address for the active network the panel says so and the game
 is free play only.
 

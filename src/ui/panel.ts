@@ -22,6 +22,8 @@ export interface PanelState {
   pendingScore: number | null;
   /** The recorded game behind pendingScore, for the verifier. */
   pendingGame: GameRecord | null;
+  /** Label of the network being navigated to, shown as a banner while the page changes. */
+  switching: string | null;
 }
 
 export interface PanelActions {
@@ -166,6 +168,7 @@ export class Panel {
       `<tr class="${c.player === me ? "me" : ""}"><td>R${c.round}</td><td>${explorerLink(c.player)}</td><td>${c.score}</td></tr>`).join("");
 
     this.root.innerHTML = `
+      ${s.switching ? `<div class="banner">Switching to ${s.switching}…</div>` : ""}
       <h1><img class="logo" src="${import.meta.env.BASE_URL}tezos.svg" alt="" width="18" height="24" />${config.layer === "l2" ? `<sup class="x" title="Tezos X">X</sup>` : ""} TEZINVADERS</h1>
       <section><div class="row"><h2>Wallet</h2>${networkHtml}</div>${walletHtml}</section>
       <section><h2>Prize pool</h2>${poolHtml}</section>

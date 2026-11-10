@@ -49,9 +49,14 @@ export class Wallet {
     });
   }
 
-  /** Re-attach to a session the client persisted in local storage. */
+  /** Re-attach to a session the client persisted in local storage, unless it belongs to another network (then drop it). */
   async restore(): Promise<string | null> {
     const account = await this.provider.client.getActiveAccount();
+    if (account && account.network.type !== config.network) {
+      void this.provider.client.clearActiveAccount().catch(() => undefined);
+      this.address = null;
+      return null;
+    }
     this.address = account?.address ?? null;
     return this.address;
   }
