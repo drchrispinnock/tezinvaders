@@ -4,7 +4,7 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { Sim, encodeLog, type Input } from "../src/game/sim";
 import { ATTESTATION_TTL_S, attest, attestationBytes, checkClaim, signClaim, verifierPublicKey, type AttestRequest } from "./attest";
-import { keyFor, keysFromEnv } from "./http";
+import { keyFor, keysFromEnv, keysFromJson } from "./http";
 
 // A throwaway key made with verifier/keygen.ts.
 const SK = "edsk3QoqBuvdamxouPhin7swCvkQNgq4jP5KZPbwWNnwdZpSpJiEbq";
@@ -70,5 +70,14 @@ describe("post-quantum verifier key", () => {
     expect(keyFor(keys, "NetXhb8apwTcVhJ")).toBe(SK);
     expect(keyFor(keys, "NetXsqzbfFenSTS")).toBe(SK);
     expect(() => keysFromEnv({})).toThrow(/VERIFIER_SECRET_KEY/);
+  });
+});
+
+describe("keysFromJson", () => {
+  it("reads the Secrets Manager document and ignores malformed entries", () => {
+    const keys = keysFromJson(JSON.stringify({ default: SK, byChain: { NetXhb8apwTcVhJ: SK, nope: SK, NetXsqzbfFenSTS: "garbage" } }));
+    expect(keys.default).toBe(SK);
+    expect(Object.keys(keys.byChain)).toEqual(["NetXhb8apwTcVhJ"]);
+    expect(() => keysFromJson("{}")).toThrow(/default edsk/);
   });
 });

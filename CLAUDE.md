@@ -266,8 +266,11 @@ ended with that score, and signs `PACK (pair (pair chain_id contract) (pair (pai
 score) expires))` with its edsk, `expires` being 15 minutes out so an attestation cannot be
 banked for a later round. The contract checks the signature against its `verifier` key.
 `verifier/server.ts` is a plain Node server, `verifier/lambda.ts` the same behind a Lambda
-Function URL (`npm run verifier:bundle` bundles it with rolldown; `deploy/verifier-lambda.yml`
-and `deploy/verifier-deploy.sh` create and update it), `verifier/keygen.ts` makes a key pair
+Function URL, reading its keys from the Secrets Manager secret in `VERIFIER_SECRET_ARN`
+(`deploy/verifier-secret.sh` writes it from `.env`; Quantumnet's ML-DSA key exceeds the Lambda
+environment limit) (`npm run verifier:bundle` bundles it with rolldown, the AWS SDK left
+external since the runtime ships it; `deploy/verifier-lambda.yml` and `deploy/verifier-deploy.sh`
+create and update it), `verifier/keygen.ts` makes a key pair
 and `verifier/sign.ts` signs arbitrary claims for the mockup tests, which run the real signing
 code so the packing is checked against the chain. Node runs the verifier directly; the
 octez.js packages are CommonJS to it, hence the default-import-and-destructure style there.

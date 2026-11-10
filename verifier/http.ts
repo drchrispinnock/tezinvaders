@@ -44,6 +44,17 @@ export async function handle(method: string, path: string, body: string, keys: V
 
 const SECRET_KEY = /^(edsk|mdsk)[1-9A-HJ-NP-Za-km-z]{50,6000}$/;
 
+/** Keys from a JSON document `{ "default": "edsk…", "byChain": { "NetX…": "mdsk…" } }` (the Secrets Manager secret). */
+export function keysFromJson(text: string): VerifierKeys {
+  const doc = JSON.parse(text) as Partial<VerifierKeys>;
+  if (typeof doc.default !== "string" || !SECRET_KEY.test(doc.default)) throw new Error("the secret needs a default edsk");
+  const byChain: Record<string, string> = {};
+  for (const [chain, key] of Object.entries(doc.byChain ?? {})) {
+    if (/^Net[1-9A-HJ-NP-Za-km-z]{12}$/.test(chain) && typeof key === "string" && SECRET_KEY.test(key)) byChain[chain] = key;
+  }
+  return { default: doc.default, byChain };
+}
+
 export function keysFromEnv(env: NodeJS.ProcessEnv = process.env): VerifierKeys {
   const key = env.VERIFIER_SECRET_KEY;
   if (!key || !SECRET_KEY.test(key)) throw new Error("set VERIFIER_SECRET_KEY to the verifier secret key, edsk… (node verifier/keygen.ts makes one)");

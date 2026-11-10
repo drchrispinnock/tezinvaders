@@ -68,9 +68,23 @@ npm run verifier:keygen                    # prints edsk (secret) and edpk (the 
 VERIFIER_SECRET_KEY=edsk… npm run verifier # http://localhost:8787; set VITE_VERIFIER_URL in .env
 ```
 
-Host it as a Lambda for the live site: create the stack in `deploy/verifier-lambda.yml` with
-the edsk as its parameter, run `deploy/verifier-deploy.sh` to upload the bundle, and put the
-stack's `FunctionUrl` output into `.env.production` as `VITE_VERIFIER_URL`. The contract's
+Host it as a Lambda for the live site, with an AWS profile that can manage Secrets Manager,
+CloudFormation, IAM and Lambda:
+
+```sh
+export AWS_PROFILE=<admin profile> AWS_REGION=us-east-1
+deploy/verifier-secret.sh                       # keys from .env into Secrets Manager; prints the ARN
+aws cloudformation deploy --stack-name tezinvaders-verifier --template-file deploy/verifier-lambda.yml \
+  --capabilities CAPABILITY_IAM --parameter-overrides VerifierSecretArn=<that ARN>
+deploy/verifier-deploy.sh                       # bundles and uploads the handler
+aws cloudformation describe-stacks --stack-name tezinvaders-verifier \
+  --query "Stacks[0].Outputs[?OutputKey==`FunctionUrl`].OutputValue" --output text
+```
+
+Put that URL, without its trailing slash, into `.env.production` as `VITE_VERIFIER_URL` and run
+`npm run deploy:aws`. The secret holds the shared edsk and any per-chain key (Quantumnet's ML-DSA
+key is too large for a Lambda environment variable, hence Secrets Manager); re-run
+`deploy/verifier-secret.sh` after a key change. The contract's
 verifier key is set at origination (`VERIFIER=edpk…` for the deploy script) and can be rotated
 by the admin with `set_verifier`.
 

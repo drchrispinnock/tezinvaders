@@ -15,10 +15,11 @@
     "deploy:aws": "deploy/aws-deploy.sh",
     "verifier": "node verifier/server.ts",
     "verifier:keygen": "node verifier/keygen.ts",
-    "verifier:bundle": "rolldown verifier/lambda.ts --format esm --platform node --file verifier/dist/lambda.mjs",
+    "verifier:bundle": "rolldown verifier/lambda.ts --format esm --platform node --external @aws-sdk/client-secrets-manager --file verifier/dist/lambda.mjs",
     "contract:deploy-network": "contract/scripts/deploy-network.sh"
   },
   "devDependencies": {
+    "@aws-sdk/client-secrets-manager": "^3.1165.0",
     "typescript": "^5.9.0",
     "vite": "^8.3.7",
     "vitest": "^5.1.0"
