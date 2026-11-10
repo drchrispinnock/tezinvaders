@@ -282,6 +282,24 @@ The verifier's secrets live only in its environment (and the admin's ignored `.e
 shared edsk, plus `VERIFIER_SECRET_KEY_<chainId>` for chains with their own key (Quantumnet's
 ML-DSA-44 one). `GET /key` lists them all.
 
+## Live deployment (as of 2026-11-10)
+
+- Site: https://tezinvaders.xyz, S3 bucket `tezinvaders-site` behind CloudFront `EXG3G4877J7V`.
+  Deploy with `BUCKET=tezinvaders-site DISTRIBUTION_ID=EXG3G4877J7V AWS_PROFILE=homes3
+  INVALIDATE_PROFILE=home npm run deploy:aws` (`homes3` can only touch S3; `home` does
+  CloudFormation, Lambda, CloudFront and Secrets Manager).
+- Contracts: one per entry in `src/chain/networks.json` (Shadownet L1, Tezos X Shadownet,
+  Ushuaianet, Quantumnet; Mainnet pending). `/` redirects to Shadownet until Mainnet is live.
+- Verifier: Lambda stack `tezinvaders-verifier` in us-east-1, function URL
+  https://hceez634lkfyr6ymke4z3i3cfm0cfxne.lambda-url.us-east-1.on.aws (`VITE_VERIFIER_URL`),
+  keys in Secrets Manager `tezinvaders/verifier` (shared edsk plus Quantumnet's ML-DSA key).
+  `GET /key` lists the public keys; CloudWatch log group `/aws/lambda/tezinvaders-verifier`
+  records each request's outcome. Redeploy it with `deploy/verifier-deploy.sh` whenever the
+  simulation or verifier code changes.
+- Payout backstop: `deploy/end-rounds.sh` under launchd on the admin's Mac (install steps in
+  `deploy/com.tezinvaders.end-rounds.plist`); rounds also settle on the first ticket after the
+  deadline.
+
 ## Known prototype limitations
 
 - Scores are attested by the verifier, which only proves the recorded inputs produce that
@@ -290,9 +308,14 @@ ML-DSA-44 one). `GET /key` lists them all.
   service: whoever holds its key can sign any score (rotate with `set_verifier`).
 - Rounds settle lazily: the first ticket after the deadline pays out the old round. A round
   nobody follows waits for `end_round`; the panel shows everyone the button and
-  `deploy/end-rounds.sh` (hourly launchd job on the admin's Mac, plist in `deploy/`) calls it
-  for every contract in `.env.production`.
+  `deploy/end-rounds.sh` (hourly launchd job on the admin's Mac, plist in `deploy/`; the user
+  installs it, check `~/Library/LaunchAgents` to see whether they have) calls it for every
+  contract in `networks.json`.
 - Badge pictures are hosted with the site at tezinvaders.xyz, not on chain; if the site moves
   the admin repoints the tokens with `set_token_metadata` (literal from
   `storage.ts --token-info <id> --image-base <new base>`).
 - Winner takes the whole pool; no split, no rake.
+- The verifier replays the game with the simulation it was bundled with, so a change to
+  `src/game/sim.ts` (or sprites, which it imports) must be deployed to the Lambda
+  (`deploy/verifier-deploy.sh`) together with the site, or every submission fails with
+  "the replay scored X, not Y".

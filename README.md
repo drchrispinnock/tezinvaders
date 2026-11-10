@@ -68,8 +68,9 @@ npm run verifier:keygen                    # prints edsk (secret) and edpk (the 
 VERIFIER_SECRET_KEY=edsk… npm run verifier # http://localhost:8787; set VITE_VERIFIER_URL in .env
 ```
 
-Host it as a Lambda for the live site, with an AWS profile that can manage Secrets Manager,
-CloudFormation, IAM and Lambda:
+The live site uses a Lambda (stack `tezinvaders-verifier`, us-east-1; `GET /key` on its URL
+lists the public keys). To create it afresh, with an AWS profile that can manage Secrets
+Manager, CloudFormation, IAM and Lambda:
 
 ```sh
 export AWS_PROFILE=<admin profile> AWS_REGION=us-east-1
@@ -82,7 +83,9 @@ aws cloudformation describe-stacks --stack-name tezinvaders-verifier \
 ```
 
 Put that URL, without its trailing slash, into `.env.production` as `VITE_VERIFIER_URL` and run
-`npm run deploy:aws`. The secret holds the shared edsk and any per-chain key (Quantumnet's ML-DSA
+`npm run deploy:aws`. After any change to the game simulation or the verifier, run
+`deploy/verifier-deploy.sh` again alongside the site deploy: the verifier replays games with
+the code it was bundled with, so a mismatch makes every submission fail. The secret holds the shared edsk and any per-chain key (Quantumnet's ML-DSA
 key is too large for a Lambda environment variable, hence Secrets Manager); re-run
 `deploy/verifier-secret.sh` after a key change. The contract's
 verifier key is set at origination (`VERIFIER=edpk…` for the deploy script) and can be rotated
