@@ -2,7 +2,7 @@
 // night, with the day number. Placeholder art until the real 24 designs exist; the output is
 // public/badges/advent/<NN>.svg, the files the token metadata will point at.
 //
-//   node contract/scripts/advent-image.ts <day 1-24> [--all]
+//   node contract/scripts/advent-image.ts <day 1-25> [--all]
 
 import { mkdirSync, writeFileSync } from "node:fs";
 import { BANK, BANK_COLOR, BANK_SHADE, KINDS, bitmapSize, type Bitmap } from "../../src/game/sprites.ts";
@@ -80,10 +80,10 @@ export function adventSvg(day: number): string {
 }
 
 const [arg] = process.argv.slice(2);
-const days = process.argv.includes("--all") ? Array.from({ length: 24 }, (_, i) => i + 1) : [Number(arg)];
+const days = process.argv.includes("--all") ? Array.from({ length: 25 }, (_, i) => i + 1) : [Number(arg)];
 mkdirSync("public/badges/advent", { recursive: true });
 for (const day of days) {
-  if (!(day >= 1 && day <= 24)) { console.error("day must be 1-24"); process.exit(2); }
+  if (!(day >= 1 && day <= 25)) { console.error("day must be 1-25"); process.exit(2); }
   const file = `public/badges/advent/${String(day).padStart(2, "0")}.svg`;
   writeFileSync(file, adventSvg(day));
   console.log(file);

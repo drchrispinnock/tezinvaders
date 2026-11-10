@@ -128,3 +128,22 @@ describe("barriers", () => {
     expect([...bunker.cells].filter((c) => c === 2).length).toBeLessThan(badgeCells);
   });
 });
+
+describe("extra lives", () => {
+  it("awards one life each time the score crosses a multiple of 5000", () => {
+    const sim = playing();
+    sim.events.length = 0;
+    sim.addScore(4999);
+    expect(sim.lives).toBe(3);
+    expect(sim.events.find((e) => e.type === "life")).toBeUndefined();
+    sim.addScore(1);
+    expect(sim.lives).toBe(4);
+    expect(sim.events.filter((e) => e.type === "life")).toEqual([{ type: "life", lives: 4 }]);
+    sim.addScore(10_300); // 15300: crosses 10000 and 15000 at once
+    expect(sim.lives).toBe(6);
+    expect(sim.events.filter((e) => e.type === "life")).toHaveLength(3);
+    sim.startGame(); // a new game starts from 3 lives with the counter reset
+    expect(sim.lives).toBe(3);
+    expect(sim.nextLife).toBe(5000);
+  });
+});

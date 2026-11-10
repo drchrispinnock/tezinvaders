@@ -60,6 +60,7 @@ export class Game {
       case "bank": this.sound.bank(); break;
       case "hit": this.sound.hit(); break;
       case "wave": this.sound.wave(); break;
+      case "life": this.sound.life(); break;
       case "gameover": this.sound.gameover(); break;
       default: break;
     }

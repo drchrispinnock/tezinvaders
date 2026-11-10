@@ -2,7 +2,8 @@
 // contract metadata and the TZIP-21 token metadata for the five badges, whose images are the
 // hosted SVGs (see export-badges.ts). Runs on plain Node (22.18+ strips the types itself):
 //
-//   node contract/scripts/storage.ts --admin tz1… --verifier edpk… [--fee 1000000] [--round-length 604800] [--round-ends <unix seconds>] [--image-base <https url/>]
+//   node contract/scripts/storage.ts --admin tz1… --verifier edpk… [--fee 1000000] [--round-length 86400] [--round-ends <unix seconds>]
+//        [--advent-start <unix seconds, default 2026-12-01>] [--advent-token <first id, default 100>] [--image-base <https url/>]
 //
 // With --token-info <id> it instead prints just that badge's token_info literal, the argument
 // for the admin's set_token_metadata entrypoint (`Pair <id> <literal>`).
@@ -12,6 +13,7 @@
 
 import { parseArgs } from "node:util";
 import { BADGES, BADGE_IMAGE_BASE, badgeDescription, badgeImageUrl, type Badge } from "../../src/chain/badges.ts";
+import { ADVENT_DAYS, ADVENT_FIRST_TOKEN, ADVENT_START, adventDescription, adventImageUrl, adventName } from "../../src/chain/advent.ts";
 
 const { values } = parseArgs({
   options: {
@@ -22,6 +24,8 @@ const { values } = parseArgs({
     "round-ends": { type: "string" },
     "image-base": { type: "string", default: BADGE_IMAGE_BASE },
     "token-info": { type: "string" },
+    "advent-start": { type: "string", default: String(ADVENT_START / 1000) },
+    "advent-token": { type: "string", default: String(ADVENT_FIRST_TOKEN) },
   },
 });
 
@@ -31,24 +35,26 @@ const bytesMap = (entries: [string, string][]): string =>
   `{ ${[...entries].sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)).map(([k, v]) => `Elt "${k}" ${hex(v)}`).join("; ")} }`;
 
 const imageBase = values["image-base"]!;
-const tokenInfo = (b: Badge): string => {
-  const uri = badgeImageUrl(b, imageBase);
-  return bytesMap([
-    ["name", b.name],
-    ["symbol", b.symbol],
-    ["decimals", "0"],
-    ["description", badgeDescription(b)],
-    ["artifactUri", uri],
-    ["displayUri", uri],
-    ["thumbnailUri", uri],
-    ["formats", JSON.stringify([{ uri, mimeType: "image/svg+xml" }])],
-  ]);
-};
+const info = (name: string, symbol: string, description: string, uri: string): string => bytesMap([
+  ["name", name],
+  ["symbol", symbol],
+  ["decimals", "0"],
+  ["description", description],
+  ["artifactUri", uri],
+  ["displayUri", uri],
+  ["thumbnailUri", uri],
+  ["formats", JSON.stringify([{ uri, mimeType: "image/svg+xml" }])],
+]);
+const tokenInfo = (b: Badge): string => info(b.name, b.symbol, badgeDescription(b), badgeImageUrl(b, imageBase));
+const adventInfo = (day: number): string => info(adventName(day), `TZIADV${String(day + 1).padStart(2, "0")}`, adventDescription(day), adventImageUrl(day, imageBase));
 
 if (values["token-info"] !== undefined) {
-  const badge = BADGES.find((b) => String(b.id) === values["token-info"]);
-  if (!badge) { console.error(`no badge with id ${values["token-info"]}`); process.exit(2); }
-  console.log(tokenInfo(badge));
+  const id = Number(values["token-info"]);
+  const badge = BADGES.find((b) => b.id === id);
+  const adventToken = Number(values["advent-token"]);
+  if (badge) console.log(tokenInfo(badge));
+  else if (id >= adventToken && id < adventToken + ADVENT_DAYS) console.log(adventInfo(id - adventToken));
+  else { console.error(`no token with id ${id}`); process.exit(2); }
   process.exit(0);
 }
 
@@ -64,7 +70,15 @@ if (!Number.isInteger(length) || length <= 0 || !Number.isInteger(ends)) {
   process.exit(2);
 }
 
-const tokens = BADGES.map((b) => `Elt ${b.id} (Pair ${b.id} ${tokenInfo(b)})`).join("; ");
+const adventStart = Number(values["advent-start"]), adventToken = Number(values["advent-token"]);
+if (!Number.isInteger(adventStart) || !Number.isInteger(adventToken) || adventToken < BADGES.length) {
+  console.error("advent start must be unix seconds and the first advent token id must be above the badge ids");
+  process.exit(2);
+}
+const tokens = [
+  ...BADGES.map((b) => `Elt ${b.id} (Pair ${b.id} ${tokenInfo(b)})`),
+  ...Array.from({ length: ADVENT_DAYS }, (_, day) => `Elt ${adventToken + day} (Pair ${adventToken + day} ${adventInfo(day)})`),
+].join("; ");
 
 const content = JSON.stringify({
   name: "TezInvaders",
@@ -74,5 +88,5 @@ const content = JSON.stringify({
 });
 const metadata = bytesMap([["", "tezos-storage:content"], ["content", content]]);
 
-// admin fee round pool round_ends round_length verifier leader scores champions best ledger operators token_metadata metadata
-console.log(`Pair "${values.admin}" ${values.fee} 1 0 ${ends} ${length} "${values.verifier}" None {} {} {} {} {} { ${tokens} } ${metadata}`);
+// admin fee round pool round_ends round_length advent verifier leader scores champions best ledger operators token_metadata metadata
+console.log(`Pair "${values.admin}" ${values.fee} 1 0 ${ends} ${length} (Pair ${adventStart} ${adventToken}) "${values.verifier}" None {} {} {} {} {} { ${tokens} } ${metadata}`);

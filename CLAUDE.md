@@ -120,7 +120,7 @@ The game is split so the rules can be unit tested without a DOM:
   the top above the vanishing point), so just edit the strings.
 - `input.ts` — keyboard state; `start` and pause are edge-triggered.
 - `audio.ts` — Web Audio synth for the effects (no sample files). `Game.ts` maps sim events
-  (`shoot`, `step`, `kill`, `bank`, `hit`, `wave`, `gameover`) onto it, runs the saucer warble
+  (`shoot`, `step`, `kill`, `bank`, `hit`, `wave`, `life`, `gameover`) onto it, runs the saucer warble
   while `sim.bank` is set, and unlocks the `AudioContext` on the first keydown. M mutes;
   the choice is kept in `localStorage`.
 - `Game.ts` — fixed-timestep loop gluing the three together and forwarding events.
@@ -189,11 +189,12 @@ the HUD says FREE PLAY and the prize-pool section tells the player to connect an
 
 Hand-written Michelson (no LIGO/SmartPy toolchain assumed). Storage is a right comb accessed
 with `GET n`/`UPDATE n`: 1 admin, 3 entry_fee, 5 round, 7 pool, 9 round_ends (timestamp),
-11 round_length (int seconds), 13 verifier (`key`, signs score attestations), 15 leader
-(`option (pair address nat)`, this round's top scorer), 17 scores (`big_map address nat`,
-this round's best per ticket holder), 19 champions (`map nat (pair address nat)`, round →
-winner), 21 best (`big_map address nat`, all-time best per player), 23 ledger / 25 operators /
-27 token_metadata (FA2), 28 metadata (TZIP-16). Scores are a big map so a round can have any
+11 round_length (int seconds), 13 advent (`pair timestamp nat`: calendar start and first door
+token id), 15 verifier (`key`, signs score attestations), 17 leader (`option (pair address
+nat)`, this round's top scorer), 19 scores (`big_map address nat`, this round's best per ticket
+holder), 21 champions (`map nat (pair address nat)`, round → winner), 23 best (`big_map address
+nat`, all-time best per player), 25 ledger / 27 operators / 29 token_metadata (FA2), 30
+metadata (TZIP-16). Scores are a big map so a round can have any
 number of players; the frontend reads the table from TzKT (`readLeaderboard()`) and the
 contract never iterates it: the leader is tracked on every submit. `champions` is a plain map
 (one entry per round) read from storage.
@@ -212,13 +213,14 @@ archives them to `champions`, resets leader and scores (a fresh `EMPTY_BIG_MAP`)
 one `LAMBDA` pushed at the top of `code` and kept at the bottom of the stack (its storage type
 is spelt out, so it must follow any storage change); `play` and `end_round` `EXEC` it.
 `set_entry_fee` (admin), `set_round_length` (admin; positive seconds; also reschedules the
-current round to `NOW + length`), `set_verifier` (admin; rotates the attestation key),
+current round to `NOW + length`), `set_verifier` (admin; rotates the attestation key), `claim_advent` and `set_advent` (see
+Advent calendar below),
 `set_token_metadata` (admin; replaces one token's `token_info` map), and the TZIP-12 trio
 `transfer` / `balance_of` / `update_operators` over the badge tokens. Badges are
 semi-fungible: token ids 0–4 (dollar 1000, euro 3000, pound 5000, yen 8000, mothership
 12000), minted at most once per player per id, freely transferable. Failures use string
 `FAILWITH`s (`BAD_FEE`, `NO_TICKET`, `NOT_ADMIN`, `NO_TEZ_ACCEPTED`, `ROUND_OVER`,
-`ROUND_RUNNING`, `BAD_LENGTH`, `BAD_PROOF`, `PROOF_EXPIRED`, `UNPAYABLE_*`, `FA2_*`);
+`ROUND_RUNNING`, `BAD_LENGTH`, `BAD_PROOF`, `PROOF_EXPIRED`, `ADVENT_*`, `UNPAYABLE_*`, `FA2_*`);
 `main.ts` extracts these from octez.js errors.
 
 Michelson layout gotcha: the octez parser rejects a multi-line sequence whose elements start at
@@ -231,7 +233,24 @@ If the storage shape changes, update all of: the contract (including the settlem
 spelt-out storage type), the literal printed by `contract/scripts/storage.ts` (the only place
 the `--init` comes from), `RawStorage`/`readStorage` in `src/chain/contract.ts`, and
 `test-mockup.sh`, which reads big maps by position (the scores id follows the leader; the
-other five are the last five numbers of the storage print).
+other five are the last five numbers of the storage print). The mockup test helpers compare
+outputs with bash pattern matches rather than `grep -q`: with `pipefail`, grep closing early on
+the large origination output made `echo` fail.
+
+### Advent calendar: `claim_advent`
+
+From 1 to 25 December a ticket holder whose attested score that day is over 500 claims the
+day's FA2 token (ids `advent.first_token + day`, 100–124 for 2026), once per player per door.
+`claim_advent` takes the same `((score, expires), proof)` as `submit_score` and never touches
+the pool or the leaderboard; the day comes from `NOW` against `advent.start` (storage field 13,
+set at origination from `src/chain/advent.ts`, movable with the admin's `set_advent (start,
+first_token)` for another year). The 25 token metadata entries are part of the initial storage
+(`storage.ts`), pointing at `public/badges/advent/NN.svg`; `contract/scripts/advent-image.ts`
+generates placeholder doors (sprites in Santa hats) and `public/badges/advent/index.html` is a
+contact sheet. The panel shows the calendar from 1 to 31 December (`Panel.advent`: doors owned,
+today, missed, locked; the player's token ids come from TzKT via `readTokenIds`), and
+`?preview=advent` on the URL shows it as if it were 1 December. Errors: `ADVENT_SCORE`,
+`ADVENT_CLOSED`, `ADVENT_CLAIMED`.
 
 ### Score verification: `verifier/`
 

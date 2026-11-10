@@ -26,6 +26,7 @@ const BANK_Y = 44;
 const RESPAWN_TICKS = 90;
 const WAVE_CLEAR_TICKS = 120;
 const ERASE_RADIUS = 3; // bunker cells; a diamond of this radius plus a ragged fringe
+export const EXTRA_LIFE_EVERY = 5000;
 
 export const PLAYER_Y = HEIGHT - 72;
 export const SHIP_SIZE = bitmapSize(SHIP);
@@ -56,6 +57,7 @@ export type GameEvent =
   | { type: "bank"; points: number }
   | { type: "hit"; livesLeft: number }
   | { type: "wave"; wave: number }
+  | { type: "life"; lives: number }
   | { type: "gameover"; score: number; wave: number };
 
 export const SHOT_RECT = { w: 2, h: 10 };
@@ -118,6 +120,8 @@ export class Sim {
   phaseTimer = 0;
   events: GameEvent[] = [];
 
+  /** Score at which the next extra life is awarded (one every EXTRA_LIFE_EVERY points). */
+  nextLife = EXTRA_LIFE_EVERY;
   /** Seed of the current game. The generator restarts from it in startGame, so a recorded game replays exactly. */
   seed = 0;
   /** The current game's inputs, one code per tick (encodeInput), from startGame until gameover. */
@@ -170,6 +174,7 @@ export class Sim {
     this.log = [];
     this.recording = true;
     this.score = 0;
+    this.nextLife = EXTRA_LIFE_EVERY;
     this.lives = 3;
     this.wave = 1;
     this.events.push({ type: "start" });
@@ -293,7 +298,7 @@ export class Sim {
     for (const inv of this.invaders) {
       if (inv.alive && rectsOverlap(r, this.invaderRect(inv))) {
         inv.alive = false;
-        this.score += inv.kind.points;
+        this.addScore(inv.kind.points);
         this.events.push({ type: "kill", points: inv.kind.points, kind: inv.kind });
         this.shot = null;
         // Speed up immediately, as the original did.
@@ -304,7 +309,7 @@ export class Sim {
     const bankRect = this.bankRect();
     if (bankRect && rectsOverlap(r, bankRect)) {
       const points = BANK_POINTS[Math.floor(this.rng() * BANK_POINTS.length)] ?? 100;
-      this.score += points;
+      this.addScore(points);
       this.events.push({ type: "bank", points });
       this.bank = null;
       this.bankTimer = this.nextBankDelay();
@@ -358,6 +363,16 @@ export class Sim {
 
   private nextBankDelay(): number {
     return 900 + Math.floor(this.rng() * 900);
+  }
+
+  /** Add points, awarding an extra life each time the score crosses a multiple of EXTRA_LIFE_EVERY. */
+  addScore(points: number): void {
+    this.score += points;
+    while (this.score >= this.nextLife) {
+      this.lives++;
+      this.nextLife += EXTRA_LIFE_EVERY;
+      this.events.push({ type: "life", lives: this.lives });
+    }
   }
 
   private loseLife(): void {

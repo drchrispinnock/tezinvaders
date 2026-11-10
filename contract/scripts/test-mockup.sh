@@ -18,8 +18,9 @@ tc() { octez-client --mode mockup --base-dir "$BASE_DIR" "$@" 2>&1 | grep -v '^W
 pass=0; fail=0
 ok()   { pass=$((pass+1)); echo "  ok   $1"; }
 bad()  { fail=$((fail+1)); echo "  FAIL $1"; echo "$2" | sed 's/^/       /'; }
-expect_ok()   { out="$(tc "${@:2}")"; echo "$out" | grep -q 'successfully\|Well typed' && ok "$1" || bad "$1" "$out"; }
-expect_fail() { out="$(tc "${@:3}")"; echo "$out" | grep -q "$2" && ok "$1 (rejected: $2)" || bad "$1" "$out"; }
+# Bash pattern matches rather than `grep -q`: with pipefail, grep closing early on a big output makes echo fail.
+expect_ok()   { out="$(tc "${@:2}")"; if [[ "$out" == *successfully* || "$out" == *"Well typed"* ]]; then ok "$1"; else bad "$1" "$out"; fi; }
+expect_fail() { out="$(tc "${@:3}")"; if [[ "$out" == *"$2"* ]]; then ok "$1 (rejected: $2)"; else bad "$1" "$out"; fi; }
 storage()     { tc get contract storage for "${1:-tezinvaders}" | tr -s ' \n' ' '; }
 balance()     { tc get balance for "$1" | awk '{print $1}'; }
 # Big map ids are the last six numbers of the storage: scores, best, ledger, operators, token_metadata, metadata.
@@ -34,6 +35,8 @@ kt()          { tc show known contract "${1:-tezinvaders}"; }
 proof()       { node "$HERE/../../verifier/sign.ts" --key "$VERIFIER_SECRET_KEY" --chain "$CHAIN" --contract "$(kt "${4:-tezinvaders}")" --player "$1" --score "$2" --expires "${3:-$FAR}"; }
 # submit_ok / submit_fail "desc" [ERR] <alias> <address> <score> [contract] [expires]: a properly attested submit_score.
 submit_ok()   { expect_ok "$1" transfer 0 from "$2" to "${5:-tezinvaders}" --entrypoint submit_score --arg "Pair (Pair $4 ${6:-$FAR}) \"$(proof "$3" "$4" "${6:-$FAR}" "${5:-tezinvaders}")\"" --burn-cap 1; }
+claim_ok()    { expect_ok "$1" transfer 0 from "$2" to "${5:-tezinvaders}" --entrypoint claim_advent --arg "Pair (Pair $4 $FAR) \"$(proof "$3" "$4" "$FAR" "${5:-tezinvaders}")\"" --burn-cap 1; }
+claim_fail()  { expect_fail "$1" "$2" transfer 0 from "$3" to "${6:-tezinvaders}" --entrypoint claim_advent --arg "Pair (Pair $5 $FAR) \"$(proof "$4" "$5" "$FAR" "${6:-tezinvaders}")\"" --burn-cap 1; }
 submit_fail() { expect_fail "$1" "$2" transfer 0 from "$3" to "${6:-tezinvaders}" --entrypoint submit_score --arg "Pair (Pair $5 ${7:-$FAR}) \"$(proof "$4" "$5" "${7:-$FAR}" "${6:-tezinvaders}")\"" --burn-cap 1; }
 # Balance of ($1 token $2) in the ledger; prints 0 when the key is absent.
 ledger()      { local h; h=$(tc hash data "Pair \"$1\" $2" of type 'pair address nat' | awk '/^Script-expression-ID-Hash/{print $2}');
@@ -55,7 +58,7 @@ echo "typecheck"
 expect_ok "contract typechecks" typecheck script "$CONTRACT"
 
 echo "originate (fee 1 tez, round 1, deadline far away)"
-init=$(node "$HERE/storage.ts" --admin "$admin_addr" --verifier "$VPK" --fee 1000000 --round-length $WEEK --round-ends $FAR)
+init=$(node "$HERE/storage.ts" --admin "$admin_addr" --verifier "$VPK" --fee 1000000 --round-length $WEEK --round-ends $FAR --advent-start 0 --advent-token 100)
 expect_ok "origination" originate contract tezinvaders transferring 0 from $ADMIN \
   running "$CONTRACT" --init "$init" --burn-cap 20 --force
 
@@ -108,6 +111,25 @@ expect_bal  "P2 holds it again" "$p2_addr" 0 1
 expect_ok   "P3 removes the operator" transfer 0 from $P3 to tezinvaders --entrypoint update_operators --arg "{ Right (Pair \"$p3_addr\" (Pair \"$p1_addr\" 0)) }" --burn-cap 1
 expect_fail "P1 is no longer an operator" FA2_NOT_OPERATOR transfer 0 from $P1 to tezinvaders --entrypoint transfer --arg "$(tx "$p3_addr" "$p2_addr" 0 1)" --burn-cap 1
 
+echo "advent calendar (start at the epoch: the mockup clock makes today door 1)"
+claim_fail "no ticket, no door" NO_TICKET $P3 "$p3_addr" 600
+claim_fail "500 is not over 500" ADVENT_SCORE $P1 "$p1_addr" 500
+claim_ok   "P1 opens door 1 with 600" $P1 "$p1_addr" 600
+expect_bal "P1 holds door 1 (token 100)" "$p1_addr" 100 1
+claim_fail "P1 cannot open door 1 twice" ADVENT_CLAIMED $P1 "$p1_addr" 700
+claim_ok   "P2 opens door 1 too" $P2 "$p2_addr" 650
+expect_bal "P2 holds door 1" "$p2_addr" 100 1
+expect_fail "non-admin cannot move the calendar" NOT_ADMIN transfer 0 from $P1 to tezinvaders --entrypoint set_advent --arg "Pair 0 100" --burn-cap 1
+expect_ok   "admin moves the calendar so today is door 25" transfer 0 from $ADMIN to tezinvaders --entrypoint set_advent --arg "Pair $((1 - 24 * 86400)) 100" --burn-cap 1
+claim_ok   "P1 opens door 25" $P1 "$p1_addr" 900
+expect_bal "P1 holds door 25 (token 124)" "$p1_addr" 124 1
+expect_ok   "admin moves the calendar so it ended yesterday" transfer 0 from $ADMIN to tezinvaders --entrypoint set_advent --arg "Pair $((1 - 25 * 86400)) 100" --burn-cap 1
+claim_fail "no door after the 25th" ADVENT_CLOSED $P1 "$p1_addr" 900
+expect_ok   "admin moves the calendar into the future" transfer 0 from $ADMIN to tezinvaders --entrypoint set_advent --arg "Pair 86400 100" --burn-cap 1
+claim_fail "no door before 1 December" ADVENT_CLOSED $P1 "$p1_addr" 900
+expect_ok   "P1 gives door 1 to P3" transfer 0 from $P1 to tezinvaders --entrypoint transfer --arg "$(tx "$p1_addr" "$p3_addr" 100 1)" --burn-cap 1
+expect_bal "P3 holds door 1" "$p3_addr" 100 1
+
 echo "end_round"
 expect_fail "non-admin cannot end a running round" ROUND_RUNNING transfer 0 from $P1 to tezinvaders --entrypoint end_round --burn-cap 1
 expect_fail "non-admin cannot set fee"   NOT_ADMIN transfer 0 from $P1 to tezinvaders --entrypoint set_entry_fee --arg 5 --burn-cap 1
@@ -118,7 +140,7 @@ awk -v a="$after" -v b="$before" 'BEGIN{exit !(a-b > 1.99 && a-b < 2.01)}' \
   && ok "P1 received the 2 tez pool ($before -> $after)" || bad "P1 payout" "before=$before after=$after"
 s=$(storage)
 echo "$s" | grep -q "Elt 1 (Pair \"$p1_addr\" 12000)" && ok "champions[1] = P1 / 12000" || bad "champions" "$s"
-echo "$s" | grep -q "Pair \"$admin_addr\" 1000000 2 0 \"[0-9T:Z-]*\" $WEEK \"$VPK\" None [0-9]* { Elt 1" && ok "round 2, pool 0, leaderboard cleared, new deadline" || bad "reset" "$s"
+echo "$s" | grep -q "Pair \"$admin_addr\" 1000000 2 0 \"[0-9T:Z-]*\" $WEEK (Pair \"[0-9T:Z-]*\" 100) \"$VPK\" None [0-9]* { Elt 1" && ok "round 2, pool 0, leaderboard cleared, new deadline" || bad "reset" "$s"
 
 echo "round 2: badges are once per player"
 expect_ok  "P2 buys a ticket again" transfer 1 from $P2 to tezinvaders --entrypoint play --burn-cap 1
@@ -156,7 +178,7 @@ echo "$tm" | grep -q "$(printf 'https://example.org/badges/dollar.svg' | xxd -p 
 expect_ok   "P2 can still transfer badge 0" transfer 0 from $P2 to tezinvaders --entrypoint transfer --arg "$(tx "$p2_addr" "$p3_addr" 0 1)" --burn-cap 1
 
 echo "a round whose deadline has passed"
-init=$(node "$HERE/storage.ts" --admin "$admin_addr" --fee 1000000 --verifier "$VPK" --round-length $WEEK --round-ends 0)
+init=$(node "$HERE/storage.ts" --admin "$admin_addr" --fee 1000000 --verifier "$VPK" --round-length $WEEK --round-ends 0 --advent-start 0 --advent-token 100)
 expect_ok   "origination" originate contract closed transferring 0 from $ADMIN running "$CONTRACT" --init "$init" --burn-cap 20 --force
 submit_fail "no scores after the deadline" ROUND_OVER $P1 "$p1_addr" 10 closed
 expect_ok   "anyone can end it" transfer 0 from $P3 to closed --entrypoint end_round --burn-cap 1
@@ -165,7 +187,7 @@ expect_ok   "tickets sell again" transfer 1 from $P1 to closed --entrypoint play
 
 echo "lazy settlement: a ticket bought after the deadline pays out the old round"
 # Round 1 already over at origination, with P2 on the board and 1 tez in the pool (funded by the origination).
-init=$(node "$HERE/storage.ts" --admin "$admin_addr" --fee 1000000 --verifier "$VPK" --round-length $WEEK --round-ends 0 | sed "s/ 1 0 0 $WEEK \"$VPK\" None {} {} / 1 1000000 0 $WEEK \"$VPK\" (Some (Pair \"$p2_addr\" 700)) { Elt \"$p2_addr\" 700 } {} /")
+init=$(node "$HERE/storage.ts" --admin "$admin_addr" --fee 1000000 --verifier "$VPK" --round-length $WEEK --round-ends 0 --advent-start 0 --advent-token 100 | sed "s/ 1 0 0 $WEEK (Pair 0 100) \"$VPK\" None {} {} / 1 1000000 0 $WEEK (Pair 0 100) \"$VPK\" (Some (Pair \"$p2_addr\" 700)) { Elt \"$p2_addr\" 700 } {} /")
 expect_ok   "origination with a finished round" originate contract stale transferring 1 from $ADMIN running "$CONTRACT" --init "$init" --burn-cap 20 --force
 submit_fail "nobody can score into it" ROUND_OVER $P2 "$p2_addr" 900 stale
 before=$(balance $P2)
@@ -175,7 +197,7 @@ awk -v a="$after" -v b="$before" 'BEGIN{exit !(a-b > 0.99 && a-b < 1.01)}' \
   && ok "P2 was paid the 1 tez pool by P1's ticket ($before -> $after)" || bad "lazy payout" "before=$before after=$after"
 s=$(storage stale)
 echo "$s" | grep -q "Elt 1 (Pair \"$p2_addr\" 700)" && ok "champions[1] = P2 / 700" || bad "stale champions" "$s"
-echo "$s" | grep -q " 2 1000000 \"1970-01-08T00:00:01Z\" $WEEK \"$VPK\" (Some (Pair \"$p1_addr\" 0)) " && [ "$(score_of "$p1_addr" stale)" = 0 ] && ok "round 2 holds P1's ticket and fee, P1 leads at 0, deadline a week out" || bad "stale reset" "$s"
+echo "$s" | grep -q " 2 1000000 \"1970-01-08T00:00:01Z\" $WEEK (Pair \"1970-01-01T00:00:00Z\" 100) \"$VPK\" (Some (Pair \"$p1_addr\" 0)) " && [ "$(score_of "$p1_addr" stale)" = 0 ] && ok "round 2 holds P1's ticket and fee, P1 leads at 0, deadline a week out" || bad "stale reset" "$s"
 submit_ok   "P1 scores in the new round" $P1 "$p1_addr" 10 stale
 expect_fail "a proof for another contract" BAD_PROOF transfer 0 from $P1 to stale --entrypoint submit_score --arg "Pair (Pair 20 $FAR) \"$(proof "$p1_addr" 20 $FAR tezinvaders)\"" --burn-cap 1
 expect_fail "the new round cannot be ended early by a player" ROUND_RUNNING transfer 0 from $P3 to stale --entrypoint end_round --burn-cap 1

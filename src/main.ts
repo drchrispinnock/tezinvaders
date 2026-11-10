@@ -1,9 +1,10 @@
 import "./polyfills";
 import { DEFAULT_NETWORK, NETWORKS, config, hasContract, networkFromPath, pathFor } from "./chain/config";
-import { buyTicket, endRound, readPlayer, readStorage, setRoundLength, submitScore, type GameStorage, type ScoreEntry } from "./chain/contract";
-import { readLeaderboard, resolveAliases } from "./chain/tzkt";
+import { buyTicket, claimAdvent, endRound, readPlayer, readStorage, setRoundLength, submitScore, type GameStorage, type ScoreEntry } from "./chain/contract";
+import { readLeaderboard, readTokenIds, resolveAliases } from "./chain/tzkt";
 import { requestAttestation } from "./chain/verifier";
 import { encodeLog } from "./game/sim";
+import { adventDay } from "./chain/advent";
 import { BADGES } from "./chain/badges";
 import { Wallet } from "./chain/wallet";
 import { Game } from "./game/Game";
@@ -22,7 +23,7 @@ const canvas = document.getElementById("game") as HTMLCanvasElement;
 const panelRoot = document.getElementById("panel") as HTMLElement;
 
 const wallet = new Wallet();
-const state: PanelState = { address: null, storage: null, scores: [], badges: null, busy: false, status: "", error: false, pendingScore: null, pendingGame: null, switching: null };
+const state: PanelState = { address: null, storage: null, scores: [], badges: null, busy: false, status: "", error: false, pendingScore: null, pendingGame: null, switching: null, tokens: new Set() };
 
 const game = new Game(canvas, (e) => {
   if (e.type === "start") state.pendingScore = null;
@@ -76,7 +77,7 @@ function describe(err: unknown): string {
   if (err && typeof err === "object" && "message" in err) {
     const msg = String((err as { message: unknown }).message);
     // Surface the contract's FAILWITH string when octez.js wraps it.
-    const m = /with: \{"string":"([A-Z_]+)"\}/.exec(msg) ?? /"(BAD_FEE|NO_TICKET|NOT_ADMIN|NO_TEZ_ACCEPTED|ROUND_OVER|ROUND_RUNNING|BAD_LENGTH|BAD_PROOF|PROOF_EXPIRED|UNPAYABLE_\w+|FA2_\w+)"/.exec(msg);
+    const m = /with: \{"string":"([A-Z_]+)"\}/.exec(msg) ?? /"(BAD_FEE|NO_TICKET|NOT_ADMIN|NO_TEZ_ACCEPTED|ROUND_OVER|ROUND_RUNNING|BAD_LENGTH|BAD_PROOF|PROOF_EXPIRED|ADVENT_\w+|UNPAYABLE_\w+|FA2_\w+)"/.exec(msg);
     return m?.[1] ?? msg;
   }
   return String(err);
@@ -88,6 +89,7 @@ async function loadStorage(): Promise<GameStorage | null> {
     state.storage = await readStorage(wallet.tezos);
     state.scores = await leaderboard(state.storage.leader);
     state.badges = state.address ? await readPlayer(wallet.tezos, state.address) : null;
+    if (state.address) state.tokens = await readTokenIds(state.address).catch(() => state.tokens);
     if (state.error) state.error = false;
   } catch (err) {
     setStatus(`Could not read contract: ${describe(err)}`, true);
@@ -141,6 +143,19 @@ const panel = new Panel(panelRoot, {
     if (earned.length) throw new Status(`Badge earned: ${earned.map((b) => b.name).join(", ")}`);
     return hash;
   }),
+  claimAdvent: () => run("Claiming today's door", async () => {
+    const score = state.pendingScore, game = state.pendingGame, player = state.address, st = state.storage;
+    if (score === null || !game || !st) throw new Error("no game to claim with");
+    if (!player) throw new Error("not connected");
+    setStatus("Verifying the game…");
+    const a = await requestAttestation(player, score, game);
+    setStatus("Claiming today's door…");
+    const hash = await claimAdvent(wallet.tezos, a.score, a.expires, a.proof);
+    const day = adventDay(Date.now(), st.adventStart);
+    if (day !== null) state.tokens = new Set([...state.tokens, st.adventToken + day]);
+    await loadStorage();
+    return hash;
+  }),
   endRound: () => run("Ending round", async () => { const hash = await endRound(wallet.tezos); await loadStorage(); return hash; }),
   setRoundLength: (hours) => run(`Scheduling ${hours}h rounds`, async () => {
     const hash = await setRoundLength(wallet.tezos, Math.round(hours * 3600));
@@ -158,7 +173,7 @@ const panel = new Panel(panelRoot, {
   },
 });
 
-wallet.onAccountChange = (address) => { state.address = address; state.badges = null; refreshPanel(); void loadStorage(); };
+wallet.onAccountChange = (address) => { state.address = address; state.badges = null; state.tokens = new Set(); refreshPanel(); void loadStorage(); };
 refreshPanel();
 wallet.restore().then((address) => { state.address = address; return loadStorage(); }).catch(() => undefined);
 loadStorage();

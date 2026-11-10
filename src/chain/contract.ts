@@ -17,6 +17,9 @@ export interface GameStorage {
   roundLength: number;
   /** The key whose attestations submit_score accepts. */
   verifier: string;
+  /** Advent calendar: start (ms since epoch) and the token id of door 1. */
+  adventStart: number;
+  adventToken: number;
   /** This round's top scorer so far (the first ticket holder, at 0, until someone scores). */
   leader: ScoreEntry | null;
   /** Past round winners, most recent first. */
@@ -47,6 +50,7 @@ interface RawStorage {
   pool: BigNumber;
   round_ends: string;
   round_length: BigNumber;
+  advent: { start: string; first_token: BigNumber };
   verifier: string;
   /** octez.js gives an option of a record as `{ Some: record }` (or the bare record), and null for None. */
   leader: RawLeader | null;
@@ -76,6 +80,8 @@ export async function readStorage(tezos: TezosToolkit): Promise<GameStorage> {
     roundEnds: Date.parse(raw.round_ends),
     roundLength: raw.round_length.toNumber(),
     verifier: raw.verifier,
+    adventStart: Date.parse(raw.advent.start),
+    adventToken: raw.advent.first_token.toNumber(),
     leader: decodeLeader(raw.leader),
     champions,
   };
@@ -111,6 +117,13 @@ export async function buyTicket(tezos: TezosToolkit, entryFeeMutez: number): Pro
 /** Record an attested score: `expires` (unix seconds) and `proof` come from the verifier. */
 export async function submitScore(tezos: TezosToolkit, score: number, expires: number, proof: string): Promise<string> {
   const op = await (await method(tezos, "submit_score"))({ score, expires: new Date(expires * 1000).toISOString(), proof }).send();
+  await op.confirmation(1);
+  return op.opHash;
+}
+
+/** Claim today's Advent door with an attested score (ticket holders, over 500 points, 1-25 December). */
+export async function claimAdvent(tezos: TezosToolkit, score: number, expires: number, proof: string): Promise<string> {
+  const op = await (await method(tezos, "claim_advent"))({ score, expires: new Date(expires * 1000).toISOString(), proof }).send();
   await op.confirmation(1);
   return op.opHash;
 }

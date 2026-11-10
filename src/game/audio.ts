@@ -79,6 +79,12 @@ export class Sound {
     this.tone("square", 1319, 1319, 0.35, 0.2, 0.44);
   }
 
+  /** Extra life: a quick rising chime. */
+  life(): void {
+    [784, 988, 1175, 1568].forEach((f, i) => this.tone("triangle", f, f, 0.1, 0.22, i * 0.07));
+    this.tone("triangle", 2093, 2093, 0.3, 0.22, 0.3);
+  }
+
   /** Game over: three sinking notes. */
   gameover(): void {
     [392, 311, 233].forEach((f, i) => this.tone("sawtooth", f, f * 0.94, 0.3, 0.2, i * 0.3));

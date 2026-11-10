@@ -48,5 +48,14 @@ export async function readLeaderboard(limit = 10, fetchFn: typeof fetch = fetch)
     .sort((a, b) => b.score - a.score || a.address.localeCompare(b.address)).slice(0, limit);
 }
 
+/** Token ids of this contract that `address` holds (badges and Advent doors), from the indexer. */
+export async function readTokenIds(address: string, fetchFn: typeof fetch = fetch): Promise<Set<number>> {
+  if (!config.tzktApi || !hasContract()) return new Set();
+  const res = await fetchFn(`${config.tzktApi}/v1/tokens/balances?account=${address}&token.contract=${config.contractAddress}&balance.gt=0&select=token.tokenId&limit=1000`);
+  if (!res.ok) throw new Error(`TzKT ${res.status}`);
+  const ids = (await res.json()) as (string | number)[];
+  return new Set(ids.map(Number));
+}
+
 /** For tests. */
 export const clearAliasCache = (): void => cache.clear();

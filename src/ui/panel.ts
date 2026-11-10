@@ -1,3 +1,4 @@
+import { ADVENT_DAYS, ADVENT_THRESHOLD, adventDay, adventImageUrl } from "../chain/advent";
 import { BADGES, badgeDataUri, badgeFor } from "../chain/badges";
 import { CHAINS, DEFAULT_NETWORK, LAYERS, LAYER_SWITCH, config, formatTez, hasContract, isLayer, networkFor, pathFor, shortAddress, type NetworkName } from "../chain/config";
 import { roundOver, type GameStorage, type PlayerState, type ScoreEntry } from "../chain/contract";
@@ -22,6 +23,8 @@ export interface PanelState {
   pendingScore: number | null;
   /** The recorded game behind pendingScore, for the verifier. */
   pendingGame: GameRecord | null;
+  /** Token ids the connected player holds (from TzKT): Advent doors are adventToken + day. */
+  tokens: ReadonlySet<number>;
   /** Label of the network being navigated to, shown as a banner while the page changes. */
   switching: string | null;
 }
@@ -34,6 +37,8 @@ export interface PanelActions {
   endRound(): void;
   /** Admin: set the round length and reschedule the current round to end that long from now. */
   setRoundLength(hours: number): void;
+  /** Claim today's Advent door with the pending game. */
+  claimAdvent(): void;
   switchNetwork(name: NetworkName): void;
 }
 
@@ -155,6 +160,7 @@ export class Panel {
     }
 
     const badgesHtml = hasContract() ? this.badges(s, me) : "";
+    const adventHtml = hasContract() && s.storage ? this.advent(s, me, hasTicket) : "";
 
     // One table: the round's on-chain scores and the stand-in entries ranked together (src/data/leaderboard.json),
     // the latter dimmed and dropped once the same address holds a real ticket.
@@ -172,12 +178,39 @@ export class Panel {
       <h1><img class="logo" src="${import.meta.env.BASE_URL}tezos.svg" alt="" width="18" height="24" />${config.layer === "l2" ? `<sup class="x" title="Tezos X">X</sup>` : ""} TEZINVADERS</h1>
       <section><div class="row"><h2>Wallet</h2>${networkHtml}</div>${walletHtml}</section>
       <section><h2>Prize pool</h2>${poolHtml}</section>
+      ${adventHtml}
       ${badgesHtml}
       <section><h2>Leaderboard · this round</h2>
         ${rows ? `<table>${rows}</table>` : `<p class="muted">No scores yet.</p>`}</section>
       <section><h2>Hall of fame</h2>
         ${champs ? `<table>${champs}</table>` : `<p class="muted">No rounds finished yet.</p>`}</section>
       <section><div class="status ${s.error ? "error" : ""}">${s.status}</div></section>`;
+  }
+
+  /** The Advent calendar: shown from 1 December until the end of the month. */
+  private advent(s: PanelState, me: string | null, hasTicket: boolean): string {
+    const st = s.storage!;
+    // ?preview=advent shows the calendar as if today were 1 December (claims still follow the chain clock).
+    const preview = new URLSearchParams(location.search).get("preview") === "advent";
+    const now = preview ? st.adventStart : Date.now();
+    if (now < st.adventStart || now >= st.adventStart + 31 * 86_400_000) return "";
+    const today = adventDay(now, st.adventStart);
+    const owned = (day: number) => s.tokens.has(st.adventToken + day);
+    const doors = Array.from({ length: ADVENT_DAYS }, (_, day) => {
+      const state = owned(day) ? "owned" : day === today ? "today" : today !== null && day < today ? "missed" : "locked";
+      return `<figure class="door ${state}" title="${day + 1} December${owned(day) ? " · yours" : state === "today" ? " · today" : ""}">
+        <img src="${adventImageUrl(day, import.meta.env.BASE_URL + "badges/")}" alt="Door ${day + 1}" loading="lazy"><figcaption>${day + 1}</figcaption></figure>`;
+    }).join("");
+    const canClaim = me && hasTicket && today !== null && !owned(today) && s.pendingScore !== null && s.pendingScore > ADVENT_THRESHOLD;
+    const caption = today === null
+      ? "The calendar has closed for this year."
+      : !me ? `Ticket holders who score over ${ADVENT_THRESHOLD} on a December day open that day's door.`
+      : owned(today) ? `Door ${today + 1} is yours. Come back tomorrow.`
+      : !hasTicket ? `Buy a ticket and score over ${ADVENT_THRESHOLD} today to open door ${today + 1}.`
+      : canClaim ? `<span>Scored ${s.pendingScore}: door ${today + 1} is open</span>`
+      : `Score over ${ADVENT_THRESHOLD} today to open door ${today + 1}.`;
+    return `<section><h2>Advent calendar</h2><div class="advent">${doors}</div>
+      <div class="row"><span class="muted">${caption}</span>${canClaim ? `<button data-action="claimAdvent" ${s.busy ? "disabled" : ""}>Claim door ${today! + 1}</button>` : ""}</div></section>`;
   }
 
   private badges(s: PanelState, me: string | null): string {

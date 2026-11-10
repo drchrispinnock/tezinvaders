@@ -41,6 +41,17 @@ to the account on the network's explorer, and mix in the stand-in entries from
 `src/data/leaderboard.json` (dimmed; converted from `InitialLeaderboard.md` beside it) so the
 board never looks empty.
 
+## Advent calendar
+
+From 1 to 25 December, ticket holders who score over 500 on a given day can claim that day's
+door: an FA2 token with its own picture (`public/badges/advent/`, contact sheet at
+`/badges/advent/index.html`). One door per player per day, claimed from the panel's Advent
+section with the same verified-score flow as the leaderboard. Add `?preview=advent` to the URL
+to see the calendar before December. The admin can run it again another year with
+`set_advent`.
+
+The game also awards an extra life every 5,000 points.
+
 ## Score verification
 
 The browser never reports a bare score. The game simulation is deterministic given its seed
