@@ -31,7 +31,8 @@ export class Renderer {
    * the displayed width, and height follows from the canvas's aspect ratio.
    */
   private fitBackingStore(): void {
-    const dpr = Math.max(1, Math.min(4, window.devicePixelRatio || 1));
+    // Capped at 2: phones report 3 or more, and the pixel-art canvas gains nothing from a 1700px-wide backing store.
+    const dpr = Math.max(1, Math.min(2, window.devicePixelRatio || 1));
     if (dpr === this.dpr && this.canvas.width === WIDTH * dpr) return;
     this.dpr = dpr;
     this.canvas.width = Math.round(WIDTH * dpr);

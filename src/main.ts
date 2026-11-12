@@ -34,6 +34,9 @@ const game = new Game(canvas, (e) => {
   if (e.type === "gameover" || e.type === "start") refreshPanel();
 });
 
+// Dev only: lets the headless probes drive the game.
+if (import.meta.env.DEV) (window as unknown as { __game: Game }).__game = game;
+
 // Tezos X (L2) look: an X beside every ꜩ, a gold trim and its own favicon.
 const onL2 = config.layer === "l2";
 game.layer2 = onL2;

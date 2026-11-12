@@ -2,7 +2,12 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="theme-color" content="#05070f" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <link rel="apple-touch-icon" href="/icons/icon-180.png" />
     <title>TezInvaders</title>
     <link rel="icon" type="image/svg+xml" href="/tezos.svg" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -13,7 +18,13 @@
     <main id="app">
       <section class="stage">
         <canvas id="game" width="560" height="640" tabindex="0" aria-label="TezInvaders game"></canvas>
+        <div class="touch" aria-label="Touch controls">
+          <button type="button" data-touch="left" aria-label="Move left">◀</button>
+          <button type="button" data-touch="fire" aria-label="Fire">FIRE</button>
+          <button type="button" data-touch="right" aria-label="Move right">▶</button>
+        </div>
         <p class="controls">← → or A/D move · SPACE fire · ENTER start · P pause · M mute</p>
+        <p class="controls touch-help">Tap to start · hold to fire and steer · two fingers pause</p>
       </section>
       <aside id="panel" class="panel"></aside>
     </main>

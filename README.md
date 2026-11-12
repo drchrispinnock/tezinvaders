@@ -11,8 +11,9 @@ npm install
 npm run dev        # http://localhost:5173
 ```
 
-Keys: ← → (or A/D) move, Space fire, Enter start, P pause. Without a contract configured the game
-is free play and the side panel just says so.
+Keys: ← → (or A/D) move, Space fire, Enter start, P pause. On a phone: tap to start, hold a
+finger to fire and steer, or use the on-screen buttons; two fingers pause. Without a contract
+configured the game is free play and the side panel just says so.
 
 ## Deploy the contract and connect the app
 

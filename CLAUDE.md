@@ -75,6 +75,9 @@ is free play only.
 
 One static target:
 
+- Mobile: the layout stacks under 640px with safe-area padding; `public/manifest.webmanifest`
+  and `public/icons/` (the ꜩ mark rendered to PNG) make "Add to Home Screen" a standalone app.
+  Wallet pairing on phones is untested: it needs a mobile wallet that speaks Octez Connect.
 - **AWS**: `deploy/aws-site.yml` (CloudFormation: private S3 bucket + CloudFront with an
   Origin Access Control and a security-headers policy; no CSP yet, because Octez Connect
   pairing talks to relay hosts that would need listing). `deploy/aws-deploy.sh`
@@ -122,6 +125,12 @@ The game is split so the rules can be unit tested without a DOM:
   looping opening crawl driven by `sim.tick` (14px body at the bottom edge, prompt pinned at
   the top above the vanishing point), so just edit the strings.
 - `input.ts` — keyboard state; `start` and pause are edge-triggered.
+- `touch.ts` — touch controls, resolved to the same `Input`: the on-screen strip in `index.html`
+  (left / fire / right, shown only under ` (pointer: coarse)`), a tap on the canvas as
+  start, a held finger as fire plus steering toward it (`steer()`), a two-finger tap as pause.
+  `Game.ts` ORs keyboard and touch input each tick, unlocks audio on the first touch too, and
+  pauses a running game when the tab is hidden. Touch games record and replay like keyboard
+  ones. The canvas backing store is capped at 2 device pixels per logical pixel.
 - `audio.ts` — Web Audio synth for the effects (no sample files). `Game.ts` maps sim events
   (`shoot`, `step`, `kill`, `bank`, `hit`, `wave`, `life`, `gameover`) onto it, runs the saucer warble
   while `sim.bank` is set, and unlocks the `AudioContext` on the first keydown. M mutes;
@@ -182,7 +191,7 @@ converted from `InitialLeaderboard.md` beside it) into one table ranked by score
 ticket. Edit that file to change the list (`resolveJsonModule` is on for the import). Inputs carry `data-field` and their
 typed values survive re-renders in `Panel.drafts` (the admin's round-length box). The round
 deadline is shown as "ends in …" and refreshes with the 20 s storage poll; once passed, Buy
-ticket and Submit score are disabled and everyone sees the End round button. `main.ts` owns the single `PanelState`,
+ticket and Submit score are disabled and everyone sees the End round button. In dev builds `window.__game` exposes the `Game` for the headless probes. `main.ts` owns the single `PanelState`,
 wires game events to it (a `gameover` event sets `pendingScore`, shown as a "Submit score"
 button only if the player holds a ticket and beat their on-chain best), polls storage every
 20 s, and routes every wallet call through `run()` so busy/status/error handling is uniform.
