@@ -28,7 +28,8 @@ VERIFIER_SECRET_KEY=edsk… npm run verifier   # the score verifier on http://lo
 npm run verifier:bundle     # rolldown bundle of the Lambda handler into verifier/dist/lambda.mjs
 node contract/scripts/storage.ts --token-info 2 # one badge's token_info literal, for set_token_metadata
 node contract/scripts/export-badges.ts          # write the badge SVGs to public/badges/
-CONTRACT=KT1… SIGNER=<alias> contract/scripts/end-round.sh   # cron-able: calls end_round once the deadline has passed
+CONTRACT=KT1… SIGNER=<alias> contract/scripts/end-round.sh   # cron-able: calls end_round (via octez.js) once the deadline has passed
+node contract/scripts/call.ts --rpc <url> --contract KT1… --entrypoint <name> [--arg <michelson>]   # any admin call through octez.js (works on Quantumnet)
 SIGNER=<alias> deploy/end-rounds.sh                        # the same for every contract in .env.production (hourly launchd job)
 ```
 
@@ -318,7 +319,10 @@ ML-DSA-44 one). `GET /key` lists them all.
   score in the simulation. A bot that plays the deterministic game perfectly gets a genuine
   attestation; rate limits and anti-bot heuristics are not in place. The verifier is a trusted
   service: whoever holds its key can sign any score (rotate with `set_verifier`).
-- Rounds settle lazily: the first ticket after the deadline pays out the old round. A round
+- Rounds settle lazily: the first ticket after the deadline pays out the old round. The backstop
+  calls `end_round` through octez.js (`contract/scripts/call.ts`), because octez-client cannot
+  speak to Quantumnet's protocol; `round-ends.ts` reads the deadline from the RPC storage JSON,
+  which may arrive as a nested or a flat comb. A round
   nobody follows waits for `end_round`; the panel shows everyone the button and
   `deploy/end-rounds.sh` (hourly launchd job on the admin's Mac, plist in `deploy/`; the user
   installs it, check `~/Library/LaunchAgents` to see whether they have) calls it for every
