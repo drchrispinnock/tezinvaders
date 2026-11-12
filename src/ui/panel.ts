@@ -43,7 +43,7 @@ export interface PanelActions {
 }
 
 /** The TzKT alias when the account has one, otherwise the shortened address. */
-export const displayName = (address: string): string => aliasOf(address) ?? shortAddress(address);
+export const displayName = (address: string): string => esc(aliasOf(address) ?? shortAddress(address));
 
 /** The name as a link to the account on the network's TzKT explorer, opening in a new tab. */
 const explorerLink = (address: string, text = displayName(address)): string =>
@@ -52,6 +52,9 @@ const explorerLink = (address: string, text = displayName(address)): string =>
 /** TzKT's picture for an account (its logo when it has one, else a generated identicon), the same service for every network. */
 const avatar = (address: string): string =>
   `<img class="avatar" src="https://services.tzkt.io/v1/avatars/${address}" alt="" width="18" height="18" loading="lazy">`;
+
+/** HTML-escapes text from outside the app (TzKT aliases, status lines) before it goes into innerHTML. */
+export const esc = (s: string): string => s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!);
 
 /** "3d 4h", "2h 15m", "40m", "<1m" */
 export function formatDuration(ms: number): string {
@@ -173,12 +176,12 @@ export class Panel {
     const standIns = (FAKE_LEADERBOARD as FakeEntry[]).filter((e) => !e.address || !taken.has(e.address)).map((e) => ({ ...e, standIn: true }));
     const byScore = (a: { score: number }, b: { score: number }) => b.score - a.score;
     const rows = [...real, ...standIns].sort(byScore).slice(0, 10).map((e, i) =>
-      `<tr class="${e.address === me ? "me" : ""} ${e.standIn ? "stand-in" : ""}"><td>${i + 1}.</td><td>${e.address ? avatar(e.address) + explorerLink(e.address, e.name) : e.name}</td><td>${e.score}</td></tr>`).join("");
+      `<tr class="${e.address === me ? "me" : ""} ${e.standIn ? "stand-in" : ""}"><td>${i + 1}.</td><td>${e.address ? avatar(e.address) + explorerLink(e.address, esc(e.name)) : esc(e.name)}</td><td>${e.score}</td></tr>`).join("");
     const champs = (s.storage?.champions ?? []).slice(0, 10).map((c) =>
       `<tr class="${c.player === me ? "me" : ""}"><td>R${c.round}</td><td>${avatar(c.player)}${explorerLink(c.player)}</td><td>${c.score}</td></tr>`).join("");
 
     this.root.innerHTML = `
-      ${s.switching ? `<div class="banner">Switching to ${s.switching}…</div>` : ""}
+      ${s.switching ? `<div class="banner">Switching to ${esc(s.switching)}…</div>` : ""}
       <h1><img class="logo" src="${import.meta.env.BASE_URL}tezos.svg" alt="" width="18" height="24" />${config.layer === "l2" ? `<sup class="x" title="Tezos X">X</sup>` : ""} TEZINVADERS</h1>
       <section><div class="row"><h2>Wallet</h2>${networkHtml}</div>${walletHtml}</section>
       <section><h2>Prize pool</h2>${poolHtml}</section>
@@ -188,7 +191,7 @@ export class Panel {
         ${rows ? `<table>${rows}</table>` : `<p class="muted">No scores yet.</p>`}</section>
       <section><h2>Hall of fame</h2>
         ${champs ? `<table>${champs}</table>` : `<p class="muted">No rounds finished yet.</p>`}</section>
-      <section><div class="status ${s.error ? "error" : ""}">${s.status}</div></section>`;
+      <section><div class="status ${s.error ? "error" : ""}">${esc(s.status)}</div></section>`;
   }
 
   /** The Advent calendar: shown from 1 December until the end of the month. */

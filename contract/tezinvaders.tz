@@ -14,17 +14,18 @@
 #   19 scores         big_map address nat         this round's best score per ticket holder (TzKT serves the table)
 #   21 champions      map nat (pair address nat)  hall of fame: round -> (winner, score)
 #   23 best           big_map address nat         all-time best score per player; badges are minted when it rises
-#   25 ledger         big_map (pair owner token_id) nat                  FA2 balances
-#   27 operators      big_map (pair owner (pair operator token_id)) unit FA2 operators
-#   29 token_metadata big_map nat (pair nat (map string bytes))          TZIP-12 token metadata (TZIP-21 keys)
-#   30 metadata       big_map string bytes                               TZIP-16 contract metadata
+#   25 games          big_map (pair player (pair seed purpose)) unit   attested games already used (purpose 0 score, 1 advent door)
+#   27 ledger         big_map (pair owner token_id) nat                  FA2 balances
+#   29 operators      big_map (pair owner (pair operator token_id)) unit FA2 operators
+#   31 token_metadata big_map nat (pair nat (map string bytes))          TZIP-12 token metadata (TZIP-21 keys)
+#   32 metadata       big_map string bytes                               TZIP-16 contract metadata
 #
 # Badges (FA2 token ids), minted once per player the first time their all-time best reaches the threshold:
 #   0 Dollar TezInvader  1000    1 Euro TezInvader  3000    2 Pound TezInvader  5000
 #   3 Yen TezInvader     8000    4 TezInvaders Mothership   12000
 #
 # Entrypoints:
-#   play              pay exactly entry_fee; grants a ticket (score 0) and grows the pool. After the
+#   play              pay exactly entry_fee (implicit accounts only); grants a ticket (score 0) and grows the pool. After the
 #                     deadline it first settles the finished round (see end_round) and the ticket
 #                     goes into the new one, so payouts never depend on an off-chain caller
 #   submit_score      ((score, expires), proof): ticket holders record a score the verifier attested to.
@@ -37,13 +38,13 @@
 #   set_entry_fee m   admin: change the ticket price
 #   set_round_length  admin: seconds per round; also reschedules the current round to NOW + length
 #   set_verifier k    admin: rotate the attestation key
-#   claim_advent      ((score, expires), proof): a ticket holder with an attested score over 500 on day d of
+#   claim_advent      ((score, expires), (seed, proof)): a ticket holder with an attested score over 500 on day d of
 #                     the Advent window (0 <= d <= 24 from advent.start, by the chain clock) is minted token
 #                     advent.first_token + d, once per player per door
 #   set_advent        admin: (start, first_token) for the next calendar
 #   set_token_metadata admin: replace one badge's TZIP-21 token_info (e.g. to move the images)
 #   transfer / balance_of / update_operators   TZIP-12 (FA2)
-parameter (or (or (or (unit %play) (pair %submit_score (pair (nat %score) (timestamp %expires)) (signature %proof)))
+parameter (or (or (or (unit %play) (pair %submit_score (pair (nat %score) (timestamp %expires)) (pair (nat %seed) (signature %proof))))
                   (or (unit %end_round) (mutez %set_entry_fee)))
               (or (or (or (int %set_round_length)
                           (list %transfer (pair (address %from_)
@@ -55,7 +56,7 @@ parameter (or (or (or (unit %play) (pair %submit_score (pair (nat %score) (times
                                                       (pair %remove_operator (address %owner) (pair (address %operator) (nat %token_id)))))))
                   (or (or (pair %set_token_metadata (nat %token_id) (map %token_info string bytes))
                           (key %set_verifier))
-                      (or (pair %claim_advent (pair (nat %score) (timestamp %expires)) (signature %proof))
+                      (or (pair %claim_advent (pair (nat %score) (timestamp %expires)) (pair (nat %seed) (signature %proof)))
                           (pair %set_advent (timestamp %start) (nat %first_token))))));
 storage (pair (address %admin)
               (mutez %entry_fee)
@@ -69,6 +70,7 @@ storage (pair (address %admin)
               (big_map %scores address nat)
               (map %champions nat (pair (address %player) (nat %score)))
               (big_map %best address nat)
+              (big_map %games (pair (address %player) (pair (nat %seed) (nat %purpose))) unit)
               (big_map %ledger (pair (address %owner) (nat %token_id)) nat)
               (big_map %operators (pair (address %owner) (pair (address %operator) (nat %token_id))) unit)
               (big_map %token_metadata nat (pair (nat %token_id) (map %token_info string bytes)))
@@ -82,8 +84,8 @@ code {
        # sets the next deadline. Kept at the bottom of the stack for the entrypoints to EXEC.
        # (LAMBDA needs the storage type spelt out; keep it in step with the storage declaration.)
        LAMBDA
-         (pair address mutez nat mutez timestamp int (pair timestamp nat) key (option (pair address nat)) (big_map address nat) (map nat (pair address nat)) (big_map address nat) (big_map (pair address nat) nat) (big_map (pair address (pair address nat)) unit) (big_map nat (pair nat (map string bytes))) (big_map string bytes))
-         (pair (list operation) (pair address mutez nat mutez timestamp int (pair timestamp nat) key (option (pair address nat)) (big_map address nat) (map nat (pair address nat)) (big_map address nat) (big_map (pair address nat) nat) (big_map (pair address (pair address nat)) unit) (big_map nat (pair nat (map string bytes))) (big_map string bytes)))
+         (pair address mutez nat mutez timestamp int (pair timestamp nat) key (option (pair address nat)) (big_map address nat) (map nat (pair address nat)) (big_map address nat) (big_map (pair address (pair nat nat)) unit) (big_map (pair address nat) nat) (big_map (pair address (pair address nat)) unit) (big_map nat (pair nat (map string bytes))) (big_map string bytes))
+         (pair (list operation) (pair address mutez nat mutez timestamp int (pair timestamp nat) key (option (pair address nat)) (big_map address nat) (map nat (pair address nat)) (big_map address nat) (big_map (pair address (pair nat nat)) unit) (big_map (pair address nat) nat) (big_map (pair address (pair address nat)) unit) (big_map nat (pair nat (map string bytes))) (big_map string bytes)))
          { DUP; GET 17;                                              # leader? : storage
            IF_NONE
              { NIL operation }
@@ -110,6 +112,10 @@ code {
                    DROP;
                    DUP; GET 3; AMOUNT; COMPARE; EQ;
                    IF {} { PUSH string "BAD_FEE"; FAILWITH };
+                   # Only implicit accounts may hold tickets: they always accept the payout, whereas a contract
+                   # whose default entrypoint fails would make every settlement revert and trap the pool.
+                   SENDER; SOURCE; COMPARE; EQ;
+                   IF {} { PUSH string "IMPLICIT_ONLY"; FAILWITH };
                    # Past the deadline: settle the old round first; this ticket is for the new one.
                    DUP; GET 9; NOW; COMPARE; GE;
                    IF { DUP 2; SWAP; EXEC; UNPAIR } { NIL operation };  # ops : storage : settle
@@ -125,21 +131,29 @@ code {
                        DUP; GET 17; IF_NONE { PUSH nat 0; SENDER; PAIR; SOME; UPDATE 17 } { DROP } }
                      { DROP };
                    SWAP; PAIR }
-                 { # --- submit_score ---          ((score, expires), proof) : storage : settle
+                 { # --- submit_score ---   ((score, expires), (seed, proof)) : storage : settle
                    PUSH mutez 0; AMOUNT; COMPARE; EQ;
                    IF {} { PUSH string "NO_TEZ_ACCEPTED"; FAILWITH };
                    DUP 2; GET 9; NOW; COMPARE; LT;
                    IF {} { PUSH string "ROUND_OVER"; FAILWITH };
-                   UNPAIR; UNPAIR;                                  # new : expires : proof : storage : settle
+                   UNPAIR; SWAP; UNPAIR; DIG 2; UNPAIR;             # new : expires : seed : proof : storage : settle
                    DUP 2; NOW; COMPARE; LE;                         # NOW <= expires
                    IF {} { PUSH string "PROOF_EXPIRED"; FAILWITH };
-                   # The verifier signed PACK (pair (pair chain_id self) (pair (pair sender score) expires)).
-                   DUP 2; DUP 2; SENDER; PAIR; PAIR;
-                   SELF_ADDRESS; CHAIN_ID; PAIR; PAIR; PACK;         # bytes : new : expires : proof : storage : settle
-                   DIG 3; DUP 5; GET 15;                            # key : proof : bytes : new : expires : storage : settle
+                   # The verifier signed PACK (pair (pair chain_id self) (pair (pair sender score) (pair expires (pair round seed)))).
+                   DUP 3; DUP 6; GET 5; PAIR; DUP 3; PAIR;          # (expires, (round, seed)) : new : expires : seed : proof : storage : settle
+                   DUP 2; SENDER; PAIR; PAIR;
+                   SELF_ADDRESS; CHAIN_ID; PAIR; PAIR; PACK;         # bytes : new : expires : seed : proof : storage : settle
+                   DIG 4; DUP 6; GET 15;                            # key : proof : bytes : new : expires : seed : storage : settle
                    CHECK_SIGNATURE;
                    IF {} { PUSH string "BAD_PROOF"; FAILWITH };
-                   SWAP; DROP;                                      # new : storage : settle
+                   SWAP; DROP;                                      # new : seed : storage : settle
+                   # One attestation per game: the (player, seed, purpose 0) key must be fresh.
+                   DUP 3; GET 25; DUP 3; PUSH nat 0; SWAP; PAIR; SENDER; PAIR;   # (sender, (seed, 0)) : games : new : seed : storage : settle
+                   DUP 2; DUP 2; MEM;
+                   IF { PUSH string "GAME_USED"; FAILWITH } {};
+                   UNIT; SOME; SWAP; UPDATE;                        # games' : new : seed : storage : settle
+                   DIG 3; SWAP; UPDATE 25;                          # storage : new : seed : settle
+                   SWAP; DIG 2; DROP;                               # new : storage : settle
                    DUP 2; GET 19; SENDER; GET;
                    IF_NONE { PUSH string "NO_TICKET"; FAILWITH } {};
                    # old : new : storage
@@ -162,12 +176,12 @@ code {
                                     AND;
                                     IF { SWAP; DROP;                # id : best : storage : new
                                          DIG 2;                     # storage : id : best : new
-                                         DUP; GET 25;               # ledger : storage : id : best : new
+                                         DUP; GET 27;               # ledger : storage : id : best : new
                                          DUP 3; SENDER; PAIR;       # (sender, id) : ledger : ...
                                          DUP 2; DUP 2; GET;
                                          IF_NONE { PUSH nat 0 } {};
                                          PUSH nat 1; ADD; SOME; SWAP; UPDATE;
-                                         UPDATE 25;                 # storage : id : best : new
+                                         UPDATE 27;                 # storage : id : best : new
                                          SWAP; DROP; SWAP }         # best : storage : new
                                        { DROP 2 } };
                              DROP;                                  # storage : new
@@ -203,14 +217,14 @@ code {
                      { # --- transfer (FA2) ---                         txs : storage
                        ITER { UNPAIR; SWAP;                             # inner : from : storage
                               ITER { UNPAIR; SWAP; UNPAIR; DIG 2;       # to : id : amt : from : storage
-                                     DUP 5; GET 29; DUP 3; MEM;
+                                     DUP 5; GET 31; DUP 3; MEM;
                                      IF {} { PUSH string "FA2_TOKEN_UNDEFINED"; FAILWITH };
                                      DUP 4; SENDER; COMPARE; EQ;
                                      IF {}
-                                        { DUP 5; GET 27; DUP 3; SENDER; PAIR; DUP 6; PAIR; MEM;
+                                        { DUP 5; GET 29; DUP 3; SENDER; PAIR; DUP 6; PAIR; MEM;
                                           IF {} { PUSH string "FA2_NOT_OPERATOR"; FAILWITH } };
                                      # debit from
-                                     DUP 5; GET 25;                     # ledger : to : id : amt : from : storage
+                                     DUP 5; GET 27;                     # ledger : to : id : amt : from : storage
                                      DUP 3; DUP 6; PAIR;                # (from, id) : ledger : ...
                                      DUP 2; DUP 2; GET;
                                      IF_NONE { PUSH nat 0 } {};
@@ -223,16 +237,16 @@ code {
                                      IF_NONE { PUSH nat 0 } {};
                                      DUP 6; ADD;
                                      SOME; SWAP; UPDATE;                # ledger : to : id : amt : from : storage
-                                     DIG 5; SWAP; UPDATE 25;            # storage : to : id : amt : from
+                                     DIG 5; SWAP; UPDATE 27;            # storage : to : id : amt : from
                                      DIP { DROP 3 }; SWAP };            # from : storage
                               DROP };
                        NIL operation; PAIR } }
                  { IF_LEFT
                      { # --- balance_of (FA2) ---                       (requests, callback) : storage
                        UNPAIR;
-                       MAP { DUP 3; GET 29; DUP 2; CDR; MEM;
+                       MAP { DUP 3; GET 31; DUP 2; CDR; MEM;
                              IF {} { PUSH string "FA2_TOKEN_UNDEFINED"; FAILWITH };
-                             DUP 3; GET 25; DUP 2; GET;
+                             DUP 3; GET 27; DUP 2; GET;
                              IF_NONE { PUSH nat 0 } {};
                              SWAP; PAIR };
                        SWAP; PUSH mutez 0; DIG 2; TRANSFER_TOKENS;
@@ -241,10 +255,10 @@ code {
                        ITER { IF_LEFT
                                 { DUP; CAR; SENDER; COMPARE; EQ;
                                   IF {} { PUSH string "FA2_NOT_OWNER"; FAILWITH };
-                                  DUP 2; GET 27; UNIT; SOME; DIG 2; UPDATE; UPDATE 27 }
+                                  DUP 2; GET 29; UNIT; SOME; DIG 2; UPDATE; UPDATE 29 }
                                 { DUP; CAR; SENDER; COMPARE; EQ;
                                   IF {} { PUSH string "FA2_NOT_OWNER"; FAILWITH };
-                                  DUP 2; GET 27; NONE unit; DIG 2; UPDATE; UPDATE 27 } };
+                                  DUP 2; GET 29; NONE unit; DIG 2; UPDATE; UPDATE 29 } };
                        NIL operation; PAIR } } }
              { IF_LEFT
                  { IF_LEFT
@@ -252,8 +266,8 @@ code {
                        DUP 2; GET 1; SENDER; COMPARE; EQ;
                        IF {} { PUSH string "NOT_ADMIN"; FAILWITH };
                        UNPAIR;                                      # id : info : storage
-                       DUP 3; GET 29; DUP 3; DUP 3; PAIR; SOME; DIG 2; UPDATE;   # tm' : info : storage
-                       DIP { DROP }; UPDATE 29;
+                       DUP 3; GET 31; DUP 3; DUP 3; PAIR; SOME; DIG 2; UPDATE;   # tm' : info : storage
+                       DIP { DROP }; UPDATE 31;
                        NIL operation; PAIR }
                      { # --- set_verifier ---                   key : storage
                        DUP 2; GET 1; SENDER; COMPARE; EQ;
@@ -261,18 +275,26 @@ code {
                        UPDATE 15;
                        NIL operation; PAIR } }
                  { IF_LEFT
-                     { # --- claim_advent ---    ((score, expires), proof) : storage : settle
+                     { # --- claim_advent --- ((score, expires), (seed, proof)) : storage : settle
                        PUSH mutez 0; AMOUNT; COMPARE; EQ;
                        IF {} { PUSH string "NO_TEZ_ACCEPTED"; FAILWITH };
-                       UNPAIR; UNPAIR;                              # score : expires : proof : storage : settle
+                       UNPAIR; SWAP; UNPAIR; DIG 2; UNPAIR;         # score : expires : seed : proof : storage : settle
                        DUP 2; NOW; COMPARE; LE;
                        IF {} { PUSH string "PROOF_EXPIRED"; FAILWITH };
-                       DUP 2; DUP 2; SENDER; PAIR; PAIR;
-                       SELF_ADDRESS; CHAIN_ID; PAIR; PAIR; PACK;     # bytes : score : expires : proof : storage : settle
-                       DIG 3; DUP 5; GET 15;
+                       DUP 3; DUP 6; GET 5; PAIR; DUP 3; PAIR;      # (expires, (round, seed)) : score : expires : seed : proof : storage : settle
+                       DUP 2; SENDER; PAIR; PAIR;
+                       SELF_ADDRESS; CHAIN_ID; PAIR; PAIR; PACK;     # bytes : score : expires : seed : proof : storage : settle
+                       DIG 4; DUP 6; GET 15;
                        CHECK_SIGNATURE;
                        IF {} { PUSH string "BAD_PROOF"; FAILWITH };
-                       SWAP; DROP;                                  # score : storage : settle
+                       SWAP; DROP;                                  # score : seed : storage : settle
+                       # One door per game: (player, seed, purpose 1) must be fresh.
+                       DUP 3; GET 25; DUP 3; PUSH nat 1; SWAP; PAIR; SENDER; PAIR;
+                       DUP 2; DUP 2; MEM;
+                       IF { PUSH string "GAME_USED"; FAILWITH } {};
+                       UNIT; SOME; SWAP; UPDATE;
+                       DIG 3; SWAP; UPDATE 25;                      # storage : score : seed : settle
+                       SWAP; DIG 2; DROP;                           # score : storage : settle
                        DUP 2; GET 19; SENDER; MEM;
                        IF {} { PUSH string "NO_TICKET"; FAILWITH };
                        PUSH nat 500; SWAP; COMPARE; GT;             # score > 500
@@ -286,13 +308,13 @@ code {
                        IF { PUSH string "ADVENT_CLOSED"; FAILWITH } {};
                        DUP 2; GET 13; CDR; ADD;                     # token : storage : settle
                        # Mint one, once per player per door.
-                       DUP 2; GET 25; DUP 2; SENDER; PAIR;          # (sender, token) : ledger : token : storage : settle
+                       DUP 2; GET 27; DUP 2; SENDER; PAIR;          # (sender, token) : ledger : token : storage : settle
                        DUP 2; DUP 2; GET;
                        IF_NONE { PUSH nat 0 } {};
                        PUSH nat 0; SWAP; COMPARE; EQ;
                        IF {} { PUSH string "ADVENT_CLAIMED"; FAILWITH };
                        PUSH nat 1; SOME; SWAP; UPDATE;              # ledger' : token : storage : settle
-                       DIG 2; SWAP; UPDATE 25;                      # storage : token : settle
+                       DIG 2; SWAP; UPDATE 27;                      # storage : token : settle
                        SWAP; DROP;
                        NIL operation; PAIR }
                      { # --- set_advent ---                     (start, first_token) : storage

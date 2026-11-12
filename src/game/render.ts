@@ -52,6 +52,8 @@ export class Renderer {
       return;
     }
     this.drawHud(sim, hiScore, staked);
+    // The first three seconds of a free-play game say so, so nobody plays a whole game expecting it to count.
+    if (!staked && (sim.phase === "playing" || sim.phase === "respawn") && sim.log.length < 180) this.freePlayNotice(sim.log.length);
     if (sim.phase === "title") {
       this.drawTitle();
       return;
@@ -277,6 +279,26 @@ export class Renderer {
     ctx.textAlign = "center";
     ctx.fillStyle = Math.floor(Date.now() / 500) % 2 ? "#ffd34d" : "#7f88a8";
     ctx.fillText("PRESS ENTER TO START", WIDTH / 2, HEIGHT - 60);
+  }
+
+  private freePlayNotice(ticks: number): void {
+    const ctx = this.ctx;
+    ctx.save();
+    ctx.globalAlpha = Math.min(1, (180 - ticks) / 30);
+    ctx.fillStyle = "rgba(5, 7, 15, 0.85)";
+    ctx.fillRect(40, 232, WIDTH - 80, 84);
+    ctx.strokeStyle = "#ffd34d";
+    ctx.lineWidth = 2;
+    ctx.strokeRect(40, 232, WIDTH - 80, 84);
+    ctx.textAlign = "center";
+    ctx.fillStyle = "#ffd34d";
+    ctx.font = `20px ${FONT}`;
+    ctx.fillText("FREE PLAY", WIDTH / 2, 266);
+    ctx.fillStyle = "#e6e9f5";
+    ctx.font = `9px ${FONT}`;
+    ctx.fillText("CONNECT A WALLET AND BUY A TICKET", WIDTH / 2, 288);
+    ctx.fillText("TO PLAY FOR THE PRIZE POOL", WIDTH / 2, 302);
+    ctx.restore();
   }
 
   private overlay(title: string, sub: string): void {

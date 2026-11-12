@@ -76,14 +76,16 @@ async function run<T>(label: string, fn: () => Promise<T>): Promise<T | undefine
   }
 }
 
+/** A short, safe description of an error: the contract's FAILWITH code when there is one, else a fixed label (the raw text, which may come from a node or a wallet, goes to the console only). */
 function describe(err: unknown): string {
-  if (err && typeof err === "object" && "message" in err) {
-    const msg = String((err as { message: unknown }).message);
-    // Surface the contract's FAILWITH string when octez.js wraps it.
-    const m = /with: \{"string":"([A-Z_]+)"\}/.exec(msg) ?? /"(BAD_FEE|NO_TICKET|NOT_ADMIN|NO_TEZ_ACCEPTED|ROUND_OVER|ROUND_RUNNING|BAD_LENGTH|BAD_PROOF|PROOF_EXPIRED|ADVENT_\w+|UNPAYABLE_\w+|FA2_\w+)"/.exec(msg);
-    return m?.[1] ?? msg;
-  }
-  return String(err);
+  const msg = err && typeof err === "object" && "message" in err ? String((err as { message: unknown }).message) : String(err);
+  const m = /with: \{"string":"([A-Z_]+)"\}/.exec(msg) ?? /"(BAD_FEE|NO_TICKET|NOT_ADMIN|NO_TEZ_ACCEPTED|ROUND_OVER|ROUND_RUNNING|BAD_LENGTH|BAD_PROOF|PROOF_EXPIRED|GAME_USED|IMPLICIT_ONLY|ADVENT_\w+|UNPAYABLE_\w+|FA2_\w+)"/.exec(msg);
+  if (m) return m[1]!;
+  console.error(err);
+  if (/pairing cancelled|aborted|rejected|cancel/i.test(msg)) return "cancelled in the wallet";
+  if (/replay scored|did not end|bad (seed|score|player|round)|input log/i.test(msg)) return msg.replace(/[<>&"']/g, "");
+  if (/Failed to fetch|NetworkError|timeout/i.test(msg)) return "network error";
+  return "unexpected error (see the console)";
 }
 
 async function loadStorage(): Promise<GameStorage | null> {
@@ -126,13 +128,13 @@ const panel = new Panel(panelRoot, {
     return hash;
   }),
   submitScore: () => run(`Submitting score ${state.pendingScore}`, async () => {
-    const score = state.pendingScore, game = state.pendingGame, player = state.address;
-    if (score === null || !game) throw new Error("no score to submit");
+    const score = state.pendingScore, game = state.pendingGame, player = state.address, round = state.storage?.round;
+    if (score === null || !game || round === undefined) throw new Error("no score to submit");
     if (!player) throw new Error("not connected");
     setStatus("Verifying the game…");
-    const a = await requestAttestation(player, score, game);
+    const a = await requestAttestation(player, score, game, round);
     setStatus(`Submitting score ${score}…`);
-    const hash = await submitScore(wallet.tezos, a.score, a.expires, a.proof);
+    const hash = await submitScore(wallet.tezos, a.score, a.expires, game.seed, a.proof);
     state.pendingScore = null;
     state.pendingGame = null;
     const before = state.badges?.owned ?? new Set<number>();
@@ -146,9 +148,9 @@ const panel = new Panel(panelRoot, {
     if (score === null || !game || !st) throw new Error("no game to claim with");
     if (!player) throw new Error("not connected");
     setStatus("Verifying the game…");
-    const a = await requestAttestation(player, score, game);
+    const a = await requestAttestation(player, score, game, st.round);
     setStatus("Claiming today's door…");
-    const hash = await claimAdvent(wallet.tezos, a.score, a.expires, a.proof);
+    const hash = await claimAdvent(wallet.tezos, a.score, a.expires, game.seed, a.proof);
     const day = adventDay(Date.now(), st.adventStart);
     if (day !== null) state.tokens = new Set([...state.tokens, st.adventToken + day]);
     await loadStorage();

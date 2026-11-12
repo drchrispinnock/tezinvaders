@@ -88,5 +88,5 @@ const content = JSON.stringify({
 });
 const metadata = bytesMap([["", "tezos-storage:content"], ["content", content]]);
 
-// admin fee round pool round_ends round_length advent verifier leader scores champions best ledger operators token_metadata metadata
-console.log(`Pair "${values.admin}" ${values.fee} 1 0 ${ends} ${length} (Pair ${adventStart} ${adventToken}) "${values.verifier}" None {} {} {} {} {} { ${tokens} } ${metadata}`);
+// admin fee round pool round_ends round_length advent verifier leader scores champions best games ledger operators token_metadata metadata
+console.log(`Pair "${values.admin}" ${values.fee} 1 0 ${ends} ${length} (Pair ${adventStart} ${adventToken}) "${values.verifier}" None {} {} {} {} {} {} { ${tokens} } ${metadata}`);

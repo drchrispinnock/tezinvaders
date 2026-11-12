@@ -1,0 +1,9 @@
+# Test helper: a contract that forwards whatever tez it receives to TezInvaders' play entrypoint,
+# so the tests can show that contracts are refused as ticket holders (IMPLICIT_ONLY).
+parameter unit;
+storage address;
+code { CDR;
+       DUP; CONTRACT %play unit;
+       IF_NONE { PUSH string "NO_TARGET"; FAILWITH } {};
+       AMOUNT; UNIT; TRANSFER_TOKENS;
+       NIL operation; SWAP; CONS; PAIR }

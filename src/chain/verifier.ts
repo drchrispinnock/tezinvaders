@@ -14,12 +14,13 @@ export interface Attestation {
 
 export interface GameRecord { seed: number; log: string }
 
-export async function requestAttestation(player: string, score: number, game: GameRecord, fetchFn: typeof fetch = fetch): Promise<Attestation> {
+/** `round` is the round the score is for; the contract packs its own round number, so a mismatch is refused. */
+export async function requestAttestation(player: string, score: number, game: GameRecord, round: number, fetchFn: typeof fetch = fetch): Promise<Attestation> {
   if (!config.verifierUrl) throw new Error("no score verifier configured");
   const res = await fetchFn(`${config.verifierUrl}/attest`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ chainId: config.chainId, contract: config.contractAddress, player, score, seed: game.seed, log: game.log }),
+    body: JSON.stringify({ chainId: config.chainId, contract: config.contractAddress, player, score, round, seed: game.seed, log: game.log }),
   });
   const body = (await res.json().catch(() => ({}))) as Partial<Attestation> & { error?: string };
   if (!res.ok) throw new Error(body.error ?? `verifier answered ${res.status}`);

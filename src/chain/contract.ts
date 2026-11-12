@@ -114,16 +114,16 @@ export async function buyTicket(tezos: TezosToolkit, entryFeeMutez: number): Pro
   return op.opHash;
 }
 
-/** Record an attested score: `expires` (unix seconds) and `proof` come from the verifier. */
-export async function submitScore(tezos: TezosToolkit, score: number, expires: number, proof: string): Promise<string> {
-  const op = await (await method(tezos, "submit_score"))({ score, expires: new Date(expires * 1000).toISOString(), proof }).send();
+/** Record an attested score: `expires` (unix seconds) and `proof` come from the verifier, `seed` is the game's. */
+export async function submitScore(tezos: TezosToolkit, score: number, expires: number, seed: number, proof: string): Promise<string> {
+  const op = await (await method(tezos, "submit_score"))({ score, expires: new Date(expires * 1000).toISOString(), seed, proof }).send();
   await op.confirmation(1);
   return op.opHash;
 }
 
 /** Claim today's Advent door with an attested score (ticket holders, over 500 points, 1-25 December). */
-export async function claimAdvent(tezos: TezosToolkit, score: number, expires: number, proof: string): Promise<string> {
-  const op = await (await method(tezos, "claim_advent"))({ score, expires: new Date(expires * 1000).toISOString(), proof }).send();
+export async function claimAdvent(tezos: TezosToolkit, score: number, expires: number, seed: number, proof: string): Promise<string> {
+  const op = await (await method(tezos, "claim_advent"))({ score, expires: new Date(expires * 1000).toISOString(), seed, proof }).send();
   await op.confirmation(1);
   return op.opHash;
 }

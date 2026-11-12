@@ -53,6 +53,9 @@ to see the calendar before December. The admin can run it again another year wit
 
 The game also awards an extra life every 5,000 points.
 
+A game that starts without a ticket shows FREE PLAY for its first seconds, so nobody plays a
+whole game expecting it to count. Only implicit accounts (tz addresses) can hold tickets.
+
 ## Score verification
 
 The browser never reports a bare score. The game simulation is deterministic given its seed
