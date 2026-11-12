@@ -40,8 +40,17 @@ export interface ScoreRow { address: string; score: number }
  * which TzKT lists but cannot sort by value, so every key is fetched (up to 10,000) and sorted here.
  */
 export async function readLeaderboard(limit = 10, fetchFn: typeof fetch = fetch): Promise<ScoreRow[]> {
+  return readScoreMap("scores", limit, fetchFn);
+}
+
+/** Every player's all-time best (the `best` big map), highest first. */
+export async function readAllTime(limit = 10, fetchFn: typeof fetch = fetch): Promise<ScoreRow[]> {
+  return readScoreMap("best", limit, fetchFn);
+}
+
+async function readScoreMap(name: "scores" | "best", limit: number, fetchFn: typeof fetch): Promise<ScoreRow[]> {
   if (!config.tzktApi || !hasContract()) return [];
-  const res = await fetchFn(`${config.tzktApi}/v1/contracts/${config.contractAddress}/bigmaps/scores/keys?active=true&limit=10000&select=key,value`);
+  const res = await fetchFn(`${config.tzktApi}/v1/contracts/${config.contractAddress}/bigmaps/${name}/keys?active=true&limit=10000&select=key,value`);
   if (!res.ok) throw new Error(`TzKT ${res.status}`);
   const rows = (await res.json()) as { key: string; value: string }[];
   return rows.map((r) => ({ address: r.key, score: Number(r.value) }))

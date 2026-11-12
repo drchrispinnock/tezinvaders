@@ -14,6 +14,8 @@ export interface PanelState {
   storage: GameStorage | null;
   /** This round's table, highest first (from TzKT, with the on-chain leader merged in). */
   scores: ScoreEntry[];
+  /** Every player's all-time best, highest first (the `best` big map via TzKT). */
+  allTime: ScoreEntry[];
   /** The connected player's ticket, all-time best and badges; null until loaded or when not connected. */
   badges: PlayerState | null;
   busy: boolean;
@@ -177,6 +179,8 @@ export class Panel {
     const byScore = (a: { score: number }, b: { score: number }) => b.score - a.score;
     const rows = [...real, ...standIns].sort(byScore).slice(0, 10).map((e, i) =>
       `<tr class="${e.address === me ? "me" : ""} ${e.standIn ? "stand-in" : ""}"><td>${i + 1}.</td><td>${e.address ? avatar(e.address) + explorerLink(e.address, esc(e.name)) : esc(e.name)}</td><td>${e.score}</td></tr>`).join("");
+    const allTime = s.allTime.slice(0, 10).map((e, i) =>
+      `<tr class="${e.address === me ? "me" : ""}"><td>${i + 1}.</td><td>${avatar(e.address)}${explorerLink(e.address)}</td><td>${e.score}</td></tr>`).join("");
     const champs = (s.storage?.champions ?? []).slice(0, 10).map((c) =>
       `<tr class="${c.player === me ? "me" : ""}"><td>R${c.round}</td><td>${avatar(c.player)}${explorerLink(c.player)}</td><td>${c.score}</td></tr>`).join("");
 
@@ -189,6 +193,8 @@ export class Panel {
       ${badgesHtml}
       <section><h2>Leaderboard · this round</h2>
         ${rows ? `<table>${rows}</table>` : `<p class="muted">No scores yet.</p>`}</section>
+      <section><h2>All-time best</h2>
+        ${allTime ? `<table>${allTime}</table>` : `<p class="muted">No scores yet.</p>`}</section>
       <section><h2>Hall of fame</h2>
         ${champs ? `<table>${champs}</table>` : `<p class="muted">No rounds finished yet.</p>`}</section>
       <section><div class="status ${s.error ? "error" : ""}">${esc(s.status)}</div></section>`;

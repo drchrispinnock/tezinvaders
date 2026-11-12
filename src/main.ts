@@ -1,7 +1,7 @@
 import "./polyfills";
 import { DEFAULT_NETWORK, NETWORKS, config, hasContract, networkFromPath, pathFor } from "./chain/config";
 import { buyTicket, claimAdvent, endRound, readPlayer, readStorage, setRoundLength, submitScore, type GameStorage, type ScoreEntry } from "./chain/contract";
-import { mergeLeader, readLeaderboard, readTokenIds, resolveAliases } from "./chain/tzkt";
+import { mergeLeader, readAllTime, readLeaderboard, readTokenIds, resolveAliases } from "./chain/tzkt";
 import { requestAttestation } from "./chain/verifier";
 import { encodeLog } from "./game/sim";
 import { adventDay } from "./chain/advent";
@@ -24,7 +24,7 @@ const canvas = document.getElementById("game") as HTMLCanvasElement;
 const panelRoot = document.getElementById("panel") as HTMLElement;
 
 const wallet = new Wallet();
-const state: PanelState = { address: null, storage: null, scores: [], badges: null, busy: false, status: "", error: false, pendingScore: null, pendingGame: null, switching: null, tokens: new Set() };
+const state: PanelState = { address: null, storage: null, scores: [], allTime: [], badges: null, busy: false, status: "", error: false, pendingScore: null, pendingGame: null, switching: null, tokens: new Set() };
 
 const game = new Game(canvas, (e) => {
   if (e.type === "start") state.pendingScore = null;
@@ -107,6 +107,7 @@ async function loadStorage(): Promise<GameStorage | null> {
   try {
     state.storage = await readStorage(wallet.tezos);
     state.scores = await leaderboard(state.storage.leader);
+    state.allTime = await readAllTime().catch(() => state.allTime);
     state.badges = state.address ? await readPlayer(wallet.tezos, state.address) : null;
     if (state.address) state.tokens = await readTokenIds(state.address).catch(() => state.tokens);
     if (state.error) state.error = false;
@@ -126,7 +127,7 @@ async function leaderboard(leader: ScoreEntry | null): Promise<ScoreEntry[]> {
 /** Look up TzKT aliases for everyone on the boards (and the player), re-rendering if any are new. */
 async function nameAddresses(): Promise<void> {
   const s = state.storage;
-  const addresses = [...state.scores.map((e) => e.address), ...(s?.champions ?? []).map((c) => c.player)];
+  const addresses = [...state.scores.map((e) => e.address), ...state.allTime.map((e) => e.address), ...(s?.champions ?? []).map((c) => c.player)];
   if (state.address) addresses.push(state.address);
   if (await resolveAliases(addresses)) refreshPanel();
 }

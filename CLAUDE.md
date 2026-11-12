@@ -161,7 +161,8 @@ which are per-cell bitmaps eroded by `eraseBlob`.
   `setRoundLength` wrap the entrypoints via `methodsObject` and wait for 1 confirmation. The
   round's table itself comes from TzKT (`readLeaderboard()` in `tzkt.ts`, which fetches the
   scores big map's keys and sorts them here, TzKT cannot sort by value); `main.ts` merges the
-  on-chain leader in case the indexer lags. Unit entrypoints must be called with
+  on-chain leader in case the indexer lags. `readAllTime()` does the same for the `best` big map, shown
+  as the "All-time best" section between the round table and the hall of fame. Unit entrypoints must be called with
   `UnitValue` (from `@tezos-x/octez.js`).
 - `tzkt.ts` — `resolveAliases()` fetches TzKT account aliases in batches from the active
   network's TzKT API (`tzktApi` in `config.ts`: api.shadownet.tzkt.io / api.tzkt.io) into a
