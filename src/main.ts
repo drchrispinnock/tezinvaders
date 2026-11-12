@@ -2,7 +2,7 @@ import "./polyfills";
 import { DEFAULT_NETWORK, NETWORKS, config, hasContract, networkFromPath, pathFor } from "./chain/config";
 import { buyTicket, claimAdvent, endRound, readPlayer, readStorage, setRoundLength, submitScore, type GameStorage, type ScoreEntry } from "./chain/contract";
 import { mergeLeader, readAllTime, readLeaderboard, readTokenIds, resolveAliases } from "./chain/tzkt";
-import { requestAttestation } from "./chain/verifier";
+import { VerifierError, requestAttestation } from "./chain/verifier";
 import { encodeLog } from "./game/sim";
 import { adventDay } from "./chain/advent";
 import { SEED_TAG_DAY, SEED_TAG_ROUND, seedFor } from "./chain/seed";
@@ -24,7 +24,7 @@ const canvas = document.getElementById("game") as HTMLCanvasElement;
 const panelRoot = document.getElementById("panel") as HTMLElement;
 
 const wallet = new Wallet();
-const state: PanelState = { address: null, storage: null, scores: [], allTime: [], badges: null, busy: false, status: "", error: false, pendingScore: null, pendingGame: null, switching: null, tokens: new Set() };
+const state: PanelState = { address: null, storage: null, scores: [], allTime: [], badges: null, prescribedSeed: null, busy: false, status: "", error: false, pendingScore: null, pendingGame: null, switching: null, tokens: new Set() };
 
 const game = new Game(canvas, (e) => {
   if (e.type === "start") state.pendingScore = null;
@@ -34,6 +34,9 @@ const game = new Game(canvas, (e) => {
   }
   if (e.type === "gameover" || e.type === "start") refreshPanel();
 });
+
+// Every game start asks for the chain-prescribed seed, so a late poll or a wallet change cannot leave a stale one.
+game.sim.seedProvider = prescribedSeed;
 
 // Dev only: lets the headless probes drive the game.
 if (import.meta.env.DEV) (window as unknown as { __game: Game }).__game = game;
@@ -47,7 +50,7 @@ if (onL2) document.querySelector<HTMLLinkElement>("link[rel=icon]")?.setAttribut
 function refreshPanel(): void {
   const me = state.address;
   game.staked = Boolean(me && state.badges?.ticket !== null && state.badges?.ticket !== undefined);
-  game.sim.nextSeed = prescribedSeed();
+  state.prescribedSeed = prescribedSeed();
   panel.render(state);
 }
 
@@ -97,7 +100,7 @@ function describe(err: unknown): string {
   if (m) return m[1]!;
   console.error(err);
   if (/pairing cancelled|aborted|rejected|cancel/i.test(msg)) return "cancelled in the wallet";
-  if (/^the verifier /.test(msg) || /^the game recording/.test(msg)) return msg;
+  if (err instanceof VerifierError) return err.message;
   if (/Failed to fetch|NetworkError|timeout/i.test(msg)) return "network error";
   return "unexpected error (see the console)";
 }

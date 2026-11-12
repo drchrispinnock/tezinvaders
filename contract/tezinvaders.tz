@@ -103,6 +103,17 @@ code {
            DUP; GET 11; NOW; ADD; UPDATE 9;
            SWAP; PAIR };
        DUG 2;                                                      # param : storage : settle
+       # seed_for (pair n tag) -> nat: the seed the chain prescribes for a game, so a recording cannot be
+       # re-attested under another seed or kept for a later round (src/chain/seed.ts mirrors it):
+       #   NAT (first 4 bytes of BLAKE2B (PACK (Pair (Pair self sender) (Pair n tag))))
+       # with tag 0 and the round number, or tag 1 and the 0-based Advent day.
+       LAMBDA
+         (pair nat nat)
+         nat
+         { SENDER; SELF_ADDRESS; PAIR; PAIR; PACK; BLAKE2B;
+           PUSH nat 4; PUSH nat 0; SLICE;
+           IF_NONE { PUSH string "BAD_SEED"; FAILWITH } { NAT } };
+       DUG 3;                                                      # param : storage : settle : seed_for
        IF_LEFT
          { IF_LEFT
              { IF_LEFT
@@ -145,23 +156,31 @@ code {
                    CHECK_SIGNATURE;
                    IF {} { PUSH string "BAD_PROOF"; FAILWITH };
                    SWAP; DROP;                                      # new : seed : storage : settle
-                   # The game must have used the seed the chain prescribes: this round's, or, inside the Advent
-                   # window, today's door seed (so one December game counts for both). See seed_for below.
-                   DUP 2; PUSH nat 0; DUP 5; GET 5; PAIR; SENDER; SELF_ADDRESS; PAIR; PAIR; PACK; BLAKE2B;
-                   PUSH nat 4; PUSH nat 0; SLICE; IF_NONE { PUSH nat 0 } { NAT };
-                   COMPARE; EQ;                                     # seed = round seed? : new : seed : storage : settle
+                   # The game must have used the seed the chain prescribes (seed_for): this round's, or inside
+                   # the Advent window today's door seed, or yesterday's within GRACE (1800 s) of midnight for
+                   # a game that spanned it. One December game thus counts for the leaderboard and its door.
+                   DUP 2; PUSH nat 0; DUP 5; GET 5; PAIR;            # (round, 0) : seed : new : seed : storage : settle : seed_for
+                   DUP 7; SWAP; EXEC;                               # round seed : seed : new : seed : storage : settle : seed_for
+                   COMPARE; EQ;                                     # ok? : new : seed : storage : settle : seed_for
                    IF {}
-                      { DUP 2; DUP 4; GET 13; CAR; NOW; SUB; ISNAT;    # secs? : seed : new : seed : storage : settle
-                        IF_NONE { DROP; PUSH bool False }
+                      { DUP 3; GET 13; CAR; NOW; SUB; ISNAT;         # secs? : new : seed : storage : settle : seed_for
+                        IF_NONE { PUSH bool False }
                                 { PUSH nat 86400; SWAP; EDIV;
-                                  IF_NONE { DROP; PUSH bool False }
-                                          { CAR; DUP; PUSH nat 24; COMPARE; LT;
+                                  IF_NONE { PUSH bool False }
+                                          { UNPAIR;                  # day : into : new : seed : storage : settle : seed_for
+                                            DUP; PUSH nat 24; COMPARE; LT;
                                             IF { DROP; DROP; PUSH bool False }
-                                               { PUSH nat 1; SWAP; PAIR; SENDER; SELF_ADDRESS; PAIR; PAIR; PACK; BLAKE2B;
-                                                 PUSH nat 4; PUSH nat 0; SLICE; IF_NONE { PUSH nat 0 } { NAT };
-                                                 COMPARE; EQ } } };
+                                               { PUSH nat 1; DUP 2; PAIR; DUP 8; SWAP; EXEC;   # today's seed : day : into : new : seed : …
+                                                 DUP 5; COMPARE; EQ;
+                                                 IF { DROP; DROP; PUSH bool True }
+                                                    { SWAP; PUSH nat 1800; SWAP; COMPARE; LT;     # into < GRACE : day : new : seed : …
+                                                      IF { PUSH nat 1; SWAP; SUB; ISNAT;           # day-1? : new : seed : …
+                                                           IF_NONE { PUSH bool False }
+                                                                   { PUSH nat 1; SWAP; PAIR; DUP 6; SWAP; EXEC;   # yesterday's seed : new : seed : …
+                                                                     DUP 3; COMPARE; EQ } }
+                                                         { DROP; PUSH bool False } } } } };
                         IF {} { PUSH string "BAD_SEED"; FAILWITH } };
-                   SWAP; DROP;                                      # new : storage : settle
+                   SWAP; DROP;                                      # new : storage : settle : seed_for
                    DUP 2; GET 19; SENDER; GET;
                    IF_NONE { PUSH string "NO_TICKET"; FAILWITH } {};
                    # old : new : storage
@@ -300,20 +319,27 @@ code {
                        IF {} { PUSH string "NO_TICKET"; FAILWITH };
                        PUSH nat 500; SWAP; COMPARE; GT;             # score > 500
                        IF {} { PUSH string "ADVENT_SCORE"; FAILWITH };      # seed : storage : settle
-                       # Which door: day = (NOW - start) / 86400, within 0..24.
-                       DUP 2; GET 13; CAR; NOW; SUB;                # seconds since start : seed : storage : settle
+                       # Which door: day = (NOW - start) / 86400, within 0..24; `into` = seconds into that day.
+                       DUP 2; GET 13; CAR; NOW; SUB;                # secs : seed : storage : settle : seed_for
                        ISNAT; IF_NONE { PUSH string "ADVENT_CLOSED"; FAILWITH } {};
                        PUSH nat 86400; SWAP; EDIV;
-                       IF_NONE { PUSH string "ADVENT_CLOSED"; FAILWITH } { CAR };   # day : seed : storage : settle
+                       IF_NONE { PUSH string "ADVENT_CLOSED"; FAILWITH } { UNPAIR };   # day : into : seed : storage : settle : seed_for
                        DUP; PUSH nat 24; COMPARE; LT;
                        IF { PUSH string "ADVENT_CLOSED"; FAILWITH } {};
-                       # The game must have used today's seed: seed_for(day, 1).
-                       DUP; PUSH nat 1; SWAP; PAIR; SENDER; SELF_ADDRESS; PAIR; PAIR; PACK; BLAKE2B;
-                       PUSH nat 4; PUSH nat 0; SLICE; IF_NONE { PUSH nat 0 } { NAT };
-                       DUP 3; COMPARE; EQ;                          # seed = day seed? : day : seed : storage : settle
-                       IF {} { PUSH string "BAD_SEED"; FAILWITH };
-                       SWAP; DROP;                                  # day : storage : settle
-                       DUP 2; GET 13; CDR; ADD;                     # token : storage : settle
+                       # The door the game was seeded for: today's (seed_for(day, 1)) or, within GRACE (1800 s)
+                       # of midnight, yesterday's for a game that spanned it. One game opens one door.
+                       PUSH nat 1; DUP 2; PAIR; DUP 7; SWAP; EXEC;  # today's seed : day : into : seed : storage : settle : seed_for
+                       DUP 4; COMPARE; EQ;
+                       IF { SWAP; DROP }                            # door = day : seed : storage : settle : seed_for
+                          { SWAP; PUSH nat 1800; SWAP; COMPARE; LT;   # into < GRACE : day : seed : …
+                            IF {} { PUSH string "BAD_SEED"; FAILWITH };
+                            PUSH nat 1; SWAP; SUB; ISNAT;
+                            IF_NONE { PUSH string "BAD_SEED"; FAILWITH } {};   # day-1 : seed : storage : settle : seed_for
+                            PUSH nat 1; DUP 2; PAIR; DUP 6; SWAP; EXEC;        # yesterday's seed : day-1 : seed : …
+                            DUP 3; COMPARE; EQ;
+                            IF {} { PUSH string "BAD_SEED"; FAILWITH } };      # door = day-1 : seed : storage : settle : seed_for
+                       SWAP; DROP;                                  # door : storage : settle : seed_for
+                       DUP 2; GET 13; CDR; ADD;                     # token : storage : settle : seed_for
                        # Mint one, once per player per door.
                        DUP 2; GET 25; DUP 2; SENDER; PAIR;          # (sender, token) : ledger : token : storage : settle
                        DUP 2; DUP 2; GET;
@@ -329,4 +355,4 @@ code {
                        IF {} { PUSH string "NOT_ADMIN"; FAILWITH };
                        UPDATE 13;
                        NIL operation; PAIR } } } };
-       SWAP; DROP }
+       SWAP; DROP; SWAP; DROP }

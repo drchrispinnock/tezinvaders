@@ -1,6 +1,6 @@
 // Client for the score verifier (verifier/): it replays the recorded game and signs an
-// attestation that the contract's submit_score checks. One verifier serves every network; the
-// attestation names the chain and contract.
+// attestation that the contract's submit_score and claim_advent check. One verifier serves every
+// network; the attestation names the chain, the contract, the round and the game's seed.
 
 import { config } from "./config";
 
@@ -14,7 +14,9 @@ export interface Attestation {
 
 export interface GameRecord { seed: number; log: string }
 
-/** `round` is the round the score is for; the contract packs its own round number, so a mismatch is refused. */
+/** A refusal or failure of the verifier, with a message that is safe to show (see verifierReason). */
+export class VerifierError extends Error {}
+
 /** The verifier's refusal as a fixed label: its reasons are a small closed set, and nothing it says is shown verbatim. */
 export function verifierReason(error: string | undefined, status: number): string {
   const e = error ?? "";
@@ -26,6 +28,7 @@ export function verifierReason(error: string | undefined, status: number): strin
   return `the verifier answered ${status}`;
 }
 
+/** `round` is the round the score is for; the contract packs its own round number, so a mismatch is refused. */
 export async function requestAttestation(player: string, score: number, game: GameRecord, round: number, fetchFn: typeof fetch = fetch): Promise<Attestation> {
   if (!config.verifierUrl) throw new Error("no score verifier configured");
   const res = await fetchFn(`${config.verifierUrl}/attest`, {
@@ -34,7 +37,7 @@ export async function requestAttestation(player: string, score: number, game: Ga
     body: JSON.stringify({ chainId: config.chainId, contract: config.contractAddress, player, score, round, seed: game.seed, log: game.log }),
   });
   const body = (await res.json().catch(() => ({}))) as Partial<Attestation> & { error?: string };
-  if (!res.ok) throw new Error(verifierReason(body.error, res.status));
+  if (!res.ok) throw new VerifierError(verifierReason(body.error, res.status));
   if (typeof body.proof !== "string" || typeof body.expires !== "number") throw new Error("bad verifier answer");
   return body as Attestation;
 }

@@ -222,10 +222,11 @@ it first runs the settlement below, so the ticket opens the next round), `submit
 the verifier's signature over `PACK (pair (pair chain_id self_address) (pair (pair sender score)
 (pair expires (pair round seed))))` with the contract's own round number, `NOW <= expires`, and
 `seed` equal to the chain-prescribed one (else `BAD_SEED`): `seed_for(round, 0)`, or inside the
-Advent window `seed_for(day, 1)`, where `seed_for(n, tag) = NAT (first 4 bytes of BLAKE2B (PACK
-(Pair (Pair self sender) (Pair n tag))))`, mirrored by `src/chain/seed.ts`; so every game in a
-round shares one RNG, a recording is worthless in any other round, and it cannot be re-attested
-under a seed of the player's choosing; keeps the max; takes the lead when strictly higher than the
+Advent window today's `seed_for(day, 1)`, or yesterday's within the first 1800 s of a day (a game
+that spanned midnight); `seed_for(n, tag) = NAT (first 4 bytes of BLAKE2B (PACK (Pair (Pair self
+sender) (Pair n tag))))` is a second `LAMBDA` kept under `settle` on the stack and mirrored by
+`src/chain/seed.ts`; so every game in a round shares one RNG, a recording is worthless in any
+other round, and it cannot be re-attested under a seed of the player's choosing; keeps the max; takes the lead when strictly higher than the
 leader's score, so ties keep the earlier leader; when the player's all-time `best` rises it
 mints every badge whose threshold lies in (old best, new score]), `end_round` (admin at any
 time, anyone once `NOW >= round_ends`; runs the settlement: pays the full pool to the leader,
@@ -264,8 +265,10 @@ the large origination output made `echo` fail.
 From 1 to 25 December a ticket holder whose attested score that day is over 500 claims the
 day's FA2 token (ids `advent.first_token + day`, 100–124 for 2026), once per player per door.
 `claim_advent` takes the same `((score, expires), (seed, proof))` as `submit_score`, with `seed`
-required to be `seed_for(day, 1)`; `submit_score` accepts that day seed too, so one December game
-counts for both the leaderboard and the door and never touches
+required to be `seed_for(day, 1)` for today's door, or, within the first 1800 s of a day,
+`seed_for(day - 1, 1)` which opens yesterday's door (a game that spanned midnight; one game, one
+door); `submit_score` accepts the same day seeds, so one December game counts for both the
+leaderboard and the door and never touches
 the pool or the leaderboard; the day comes from `NOW` against `advent.start` (storage field 13,
 set at origination from `src/chain/advent.ts`, movable with the admin's `set_advent (start,
 first_token)` for another year). The 25 token metadata entries are part of the initial storage
@@ -293,8 +296,10 @@ score) (pair expires (pair round seed))))` with its edsk: `expires` 15 minutes o
 the client names it (the contract packs its own, so a stale proof fails), and the game's `seed`,
 which the contract requires to be the chain-prescribed seed (`seed_for`, see the contract
 section), so a recording cannot be re-attested under another seed or banked for a later round.
-`main.ts` sets `Sim.nextSeed` from `prescribedSeed()` whenever the connected player holds a ticket
-(the day seed inside the Advent window, else the round seed); free play keeps random seeds. The contract checks the signature against its `verifier` key.
+`main.ts` installs `prescribedSeed()` as `Sim.seedProvider`, asked at every game start (the day seed
+inside the Advent window, else the round seed, null in free play so the seed is random), and keeps
+the value in `PanelState.prescribedSeed` so the panel only offers Submit / Claim for a pending game
+played with it (a game from before the ticket, or from another round, gets a note instead). The contract checks the signature against its `verifier` key.
 `verifier/server.ts` is a plain Node server, `verifier/lambda.ts` the same behind a Lambda
 Function URL, reading its keys from the Secrets Manager secret in `VERIFIER_SECRET_ARN`
 (`deploy/verifier-secret.sh` writes it from `.env`; Quantumnet's ML-DSA key exceeds the Lambda

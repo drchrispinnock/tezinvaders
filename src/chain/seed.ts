@@ -5,6 +5,7 @@
 // Works in the browser and in Node (the michel-codec package is CommonJS to Node).
 
 import { blake2b } from "@noble/hashes/blake2.js";
+import { hexToBytes } from "@noble/hashes/utils.js";
 import * as michelCodec from "@tezos-x/octez.js-michel-codec";
 
 const codec = (michelCodec as unknown as { default?: typeof michelCodec }).default ?? michelCodec;
@@ -17,7 +18,6 @@ export function seedFor(contract: string, player: string, n: number, tag: number
     { prim: "Pair", args: [{ prim: "Pair", args: [{ string: contract }, { string: player }] }, { prim: "Pair", args: [{ int: String(n) }, { int: String(tag) }] }] },
     { prim: "pair", args: [{ prim: "pair", args: [{ prim: "address" }, { prim: "address" }] }, { prim: "pair", args: [{ prim: "nat" }, { prim: "nat" }] }] },
   ).bytes;
-  const bytes = Uint8Array.from(packed.match(/../g)!.map((h) => parseInt(h, 16)));
-  const hash = blake2b(bytes, { dkLen: 32 });
+  const hash = blake2b(hexToBytes(packed), { dkLen: 32 });
   return ((hash[0]! << 24) >>> 0) + (hash[1]! << 16) + (hash[2]! << 8) + hash[3]!;
 }

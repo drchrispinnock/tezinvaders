@@ -25,6 +25,8 @@ export interface PanelState {
   pendingScore: number | null;
   /** The recorded game behind pendingScore, for the verifier. */
   pendingGame: GameRecord | null;
+  /** The seed the chain prescribes for the connected ticket holder now (null in free play); a pending game with another seed cannot be submitted. */
+  prescribedSeed: number | null;
   /** Token ids the connected player holds (from TzKT): Advent doors are adventToken + day. */
   tokens: ReadonlySet<number>;
   /** Label of the network being navigated to, shown as a banner while the page changes. */
@@ -154,7 +156,9 @@ export class Panel {
         </div>
         ${hasTicket ? "" : `<p class="muted">${me ? "Buy a ticket to submit your score." : "Connect your wallet and buy a ticket to submit your score."}</p>`}
         ${s.pendingScore !== null && hasTicket && s.pendingScore > (ticket ?? 0)
-          ? over
+          ? s.pendingGame && s.prescribedSeed !== null && s.pendingGame.seed !== s.prescribedSeed
+            ? `<div class="row"><span class="muted">New best ${s.pendingScore}, but that game was played before your ticket or in another round; play again to submit</span></div>`
+            : over
             ? `<div class="row"><span class="muted">New best ${s.pendingScore}, but the round is over</span></div>`
             : !config.verifierUrl
               ? `<div class="row"><span class="muted">New best ${s.pendingScore}, but no score verifier is configured</span></div>`
@@ -214,7 +218,8 @@ export class Panel {
       return `<figure class="door ${state}" title="${day + 1} December${owned(day) ? " · yours" : state === "today" ? " · today" : ""}">
         <img src="${adventImageUrl(day, import.meta.env.BASE_URL + "badges/")}" alt="Door ${day + 1}" loading="lazy"><figcaption>${day + 1}</figcaption></figure>`;
     }).join("");
-    const canClaim = !preview && me && hasTicket && today !== null && !owned(today) && s.pendingScore !== null && s.pendingScore > ADVENT_THRESHOLD;
+    const seeded = s.pendingGame !== null && s.prescribedSeed !== null && s.pendingGame.seed === s.prescribedSeed;
+    const canClaim = !preview && me && hasTicket && today !== null && !owned(today) && s.pendingScore !== null && s.pendingScore > ADVENT_THRESHOLD && seeded;
     const caption = preview
       ? "Preview: this is how the calendar will look from 1 December."
       : today === null

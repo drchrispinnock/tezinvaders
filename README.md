@@ -57,6 +57,8 @@ A game that starts without a ticket shows FREE PLAY for its first seconds, so no
 whole game expecting it to count. Only implicit accounts (tz addresses) can hold tickets.
 Ticket holders' games are seeded by the chain (one seed per round, or per day in December), so a
 recording cannot be re-attested under another seed or kept for a later round.
+A game that spans midnight in December still counts, for the day it was seeded for, if it is
+submitted within half an hour.
 ## Score verification
 
 The browser never reports a bare score. The game simulation is deterministic given its seed

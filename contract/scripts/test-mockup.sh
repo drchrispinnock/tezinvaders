@@ -76,10 +76,11 @@ expect_ok   "proxy contract originates" originate contract proxy transferring 0 
 expect_fail "a contract cannot buy a ticket" IMPLICIT_ONLY transfer 1 from $P3 to proxy --burn-cap 1
 
 echo "submit_score"
+rs1=$(round_seed "$p1_addr"); rs2=$(round_seed "$p2_addr")   # round 1 seeds, reused by the hand-built calls below
 submit_fail "no ticket"    NO_TICKET       $P3 "$p3_addr" 999
-expect_fail "tez attached" NO_TEZ_ACCEPTED transfer 1 from $P1 to tezinvaders --entrypoint submit_score --arg "Pair (Pair 10 $FAR) (Pair $(round_seed "$p1_addr") \"$(proof "$p1_addr" 10 $FAR tezinvaders "$(round_seed "$p1_addr")")\")" --burn-cap 1
-expect_fail "made-up score, proof for another" BAD_PROOF transfer 0 from $P1 to tezinvaders --entrypoint submit_score --arg "Pair (Pair 99999 $FAR) (Pair $(round_seed "$p1_addr") \"$(proof "$p1_addr" 500 $FAR tezinvaders "$(round_seed "$p1_addr")")\")" --burn-cap 1
-expect_fail "someone else's proof" BAD_PROOF transfer 0 from $P1 to tezinvaders --entrypoint submit_score --arg "Pair (Pair 500 $FAR) (Pair $(round_seed "$p2_addr") \"$(proof "$p2_addr" 500 $FAR tezinvaders "$(round_seed "$p2_addr")")\")" --burn-cap 1
+expect_fail "tez attached" NO_TEZ_ACCEPTED transfer 1 from $P1 to tezinvaders --entrypoint submit_score --arg "Pair (Pair 10 $FAR) (Pair $rs1 \"$(proof "$p1_addr" 10 $FAR tezinvaders "$rs1")\")" --burn-cap 1
+expect_fail "made-up score, proof for another" BAD_PROOF transfer 0 from $P1 to tezinvaders --entrypoint submit_score --arg "Pair (Pair 99999 $FAR) (Pair $rs1 \"$(proof "$p1_addr" 500 $FAR tezinvaders "$rs1")\")" --burn-cap 1
+expect_fail "someone else's proof" BAD_PROOF transfer 0 from $P1 to tezinvaders --entrypoint submit_score --arg "Pair (Pair 500 $FAR) (Pair $rs2 \"$(proof "$p2_addr" 500 $FAR tezinvaders "$rs2")\")" --burn-cap 1
 submit_fail "expired proof" PROOF_EXPIRED $P1 "$p1_addr" 500 tezinvaders 0
 submit_ok   "P1 scores 500"  $P1 "$p1_addr" 500
 s=$(storage); echo "$s" | grep -q "(Some (Pair \"$p1_addr\" 500))" && ok "P1 leads" || bad "leader" "$s"
@@ -142,6 +143,18 @@ expect_ok   "admin moves the calendar into the future" transfer 0 from $ADMIN to
 DAY=0
 claim_fail "no door before 1 December" ADVENT_CLOSED $P1 "$p1_addr" 900
 expect_ok   "calendar back to today being door 1" transfer 0 from $ADMIN to tezinvaders --entrypoint set_advent --arg "Pair 0 100" --burn-cap 1
+echo "midnight grace: a game seeded for yesterday, claimed just after midnight, opens yesterday's door"
+expect_ok   "calendar set so now is 1 second into day 4" transfer 0 from $ADMIN to tezinvaders --entrypoint set_advent --arg "Pair $((1 - 3 * 86400)) 100" --burn-cap 1
+DAY=2; claim_ok "P1 claims with the day-3 seed (yesterday) and gets door 3" $P1 "$p1_addr" 800
+expect_bal "P1 holds door 3 (token 102)" "$p1_addr" 102 1
+DAY=3; claim_ok "P1 claims with today's seed and gets door 4" $P1 "$p1_addr" 800
+expect_bal "P1 holds door 4 (token 103)" "$p1_addr" 103 1
+DAY=1; claim_fail "two days ago is not within the grace" BAD_SEED $P1 "$p1_addr" 800
+SEED=$(seed_for "$p1_addr" 2 1); submit_ok "yesterday's seed also counts for the leaderboard within the grace" $P1 "$p1_addr" 5200; SEED=""
+expect_ok   "calendar set so now is an hour into day 4" transfer 0 from $ADMIN to tezinvaders --entrypoint set_advent --arg "Pair $((1 - 3 * 86400 - 3600)) 100" --burn-cap 1
+DAY=2; claim_fail "an hour after midnight yesterday's seed is refused" BAD_SEED $P1 "$p1_addr" 800
+SEED=$(seed_for "$p1_addr" 2 1); submit_fail "and it no longer counts for the leaderboard" BAD_SEED $P1 "$p1_addr" 5300; SEED=""
+expect_ok   "calendar back to today being door 1" transfer 0 from $ADMIN to tezinvaders --entrypoint set_advent --arg "Pair 0 100" --burn-cap 1
 DAY=0; SEED=$(seed_for "$p2_addr" 0 1); submit_ok "a game played with today's door seed also counts for the leaderboard" $P2 "$p2_addr" 5100; SEED=""
 expect_ok   "P1 gives door 1 to P3" transfer 0 from $P1 to tezinvaders --entrypoint transfer --arg "$(tx "$p1_addr" "$p3_addr" 100 1)" --burn-cap 1
 expect_bal "P3 holds door 1" "$p3_addr" 100 1
@@ -167,6 +180,7 @@ expect_bal "P2 earned the yen badge" "$p2_addr" 3 1
 expect_bal "P2 did not get a second euro badge" "$p2_addr" 1 1
 
 echo "round housekeeping"
+rs2=$(round_seed "$p2_addr")   # round 2 now
 expect_ok   "admin sets fee to 0.25 tez" transfer 0 from $ADMIN to tezinvaders --entrypoint set_entry_fee --arg 250000 --burn-cap 1
 expect_fail "non-admin cannot set round length" NOT_ADMIN transfer 0 from $P1 to tezinvaders --entrypoint set_round_length --arg 3600 --burn-cap 1
 expect_fail "round length must be positive" BAD_LENGTH transfer 0 from $ADMIN to tezinvaders --entrypoint set_round_length --arg 0 --burn-cap 1
@@ -175,11 +189,11 @@ s=$(storage); echo "$s" | grep -q "250000 2 1000000 \"1970-01-01T01:00:01Z\" 360
 expect_fail "non-admin cannot rotate the verifier" NOT_ADMIN transfer 0 from $P1 to tezinvaders --entrypoint set_verifier --arg "\"$VPK\"" --burn-cap 1
 OLD_SK=$VERIFIER_SECRET_KEY; OLD_PK=$VPK
 eval "$(node "$HERE/../../verifier/keygen.ts" --env)"; VPK=$VERIFIER_PUBLIC_KEY; NEW_SK=$VERIFIER_SECRET_KEY
-expect_fail "old key's proof is refused before rotation" BAD_PROOF transfer 0 from $P2 to tezinvaders --entrypoint submit_score --arg "Pair (Pair 8100 $FAR) (Pair $(round_seed "$p2_addr") \"$(proof "$p2_addr" 8100 $FAR tezinvaders "$(round_seed "$p2_addr")")\")" --burn-cap 1
+expect_fail "old key's proof is refused before rotation" BAD_PROOF transfer 0 from $P2 to tezinvaders --entrypoint submit_score --arg "Pair (Pair 8100 $FAR) (Pair $rs2 \"$(proof "$p2_addr" 8100 $FAR tezinvaders "$rs2")\")" --burn-cap 1
 expect_ok   "admin rotates the verifier" transfer 0 from $ADMIN to tezinvaders --entrypoint set_verifier --arg "\"$VPK\"" --burn-cap 1
 submit_ok   "new key's proof works" $P2 "$p2_addr" 8100
 VERIFIER_SECRET_KEY=$OLD_SK
-expect_fail "old key's proof no longer works" BAD_PROOF transfer 0 from $P2 to tezinvaders --entrypoint submit_score --arg "Pair (Pair 8200 $FAR) (Pair $(round_seed "$p2_addr") \"$(proof "$p2_addr" 8200 $FAR tezinvaders "$(round_seed "$p2_addr")")\")" --burn-cap 1
+expect_fail "old key's proof no longer works" BAD_PROOF transfer 0 from $P2 to tezinvaders --entrypoint submit_score --arg "Pair (Pair 8200 $FAR) (Pair $rs2 \"$(proof "$p2_addr" 8200 $FAR tezinvaders "$rs2")\")" --burn-cap 1
 VERIFIER_SECRET_KEY=$NEW_SK
 expect_ok   "admin can still end the round early" transfer 0 from $ADMIN to tezinvaders --entrypoint end_round --burn-cap 1
 s=$(storage); echo "$s" | grep -q "250000 3 0" && ok "round 3 with new fee" || bad "round 3" "$s"
@@ -215,7 +229,7 @@ s=$(storage stale)
 echo "$s" | grep -q "Elt 1 (Pair \"$p2_addr\" 700)" && ok "champions[1] = P2 / 700" || bad "stale champions" "$s"
 echo "$s" | grep -q " 2 1000000 \"1970-01-08T00:00:01Z\" $WEEK (Pair \"1970-01-01T00:00:00Z\" 100) \"$VPK\" (Some (Pair \"$p1_addr\" 0)) " && [ "$(score_of "$p1_addr" stale)" = 0 ] && ok "round 2 holds P1's ticket and fee, P1 leads at 0, deadline a week out" || bad "stale reset" "$s"
 submit_ok   "P1 scores in the new round" $P1 "$p1_addr" 10 stale
-expect_fail "a proof for another contract" BAD_PROOF transfer 0 from $P1 to stale --entrypoint submit_score --arg "Pair (Pair 20 $FAR) (Pair $(round_seed "$p1_addr") \"$(proof "$p1_addr" 20 $FAR tezinvaders "$(round_seed "$p1_addr")")\")" --burn-cap 1
+expect_fail "a proof for another contract" BAD_PROOF transfer 0 from $P1 to stale --entrypoint submit_score --arg "Pair (Pair 20 $FAR) (Pair $rs1 \"$(proof "$p1_addr" 20 $FAR tezinvaders "$rs1")\")" --burn-cap 1
 expect_fail "the new round cannot be ended early by a player" ROUND_RUNNING transfer 0 from $P3 to stale --entrypoint end_round --burn-cap 1
 
 echo

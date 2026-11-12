@@ -124,8 +124,8 @@ export class Sim {
   nextLife = EXTRA_LIFE_EVERY;
   /** Seed of the current game. The generator restarts from it in startGame, so a recorded game replays exactly. */
   seed = 0;
-  /** The seed the next game must use (the chain prescribes one per round or Advent day for ticket holders); null = random. */
-  nextSeed: number | null = null;
+  /** Asked at every game start for the seed the chain prescribes (one per round or Advent day for ticket holders); null = random. */
+  seedProvider: (() => number | null) | null = null;
   /** The current game's inputs, one code per tick (encodeInput), from startGame until gameover. */
   log: number[] = [];
   private recording = false;
@@ -170,7 +170,7 @@ export class Sim {
     return { x: this.bank.x, y: BANK_Y, w: BANK_SIZE.w * PX, h: BANK_SIZE.h * PX };
   }
 
-  startGame(seed = this.nextSeed ?? randomSeed()): void {
+  startGame(seed = this.seedProvider?.() ?? randomSeed()): void {
     this.seed = seed;
     this.prng = seed | 0;
     this.log = [];

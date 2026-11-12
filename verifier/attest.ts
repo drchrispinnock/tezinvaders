@@ -5,9 +5,9 @@
 //   PACK (pair (pair chain_id self_address) (pair (pair player score) (pair expires (pair round seed))))
 //
 // expires is a short deadline (ATTESTATION_TTL_S from now); round pins the attestation to the
-// round the player named, so it cannot be banked for a later one; seed identifies the game, and
-// the contract accepts each (player, seed) once per purpose, so a recording cannot be re-attested
-// and replayed on chain. The contract's verifier key is the public half of
+// round the player named (the contract packs its own, so a stale one fails); seed is the seed the
+// game was replayed with, and the contract only accepts the seed it prescribes for that player and
+// round or Advent day (src/chain/seed.ts), so a recording is worthless under any other seed. The contract's verifier key is the public half of
 // VERIFIER_SECRET_KEY (verifier/keygen.ts makes a pair; the admin sets it with set_verifier).
 
 // The octez.js packages are CommonJS to Node, so they are default-imported and destructured.
@@ -30,7 +30,7 @@ export interface Claim {
   expires: number;
   /** The round the score is for (the contract packs its own round number). */
   round: number;
-  /** The game's seed, which the contract remembers per player. */
+  /** The seed the game was replayed with; the contract requires its prescribed one. */
   seed: number;
 }
 
