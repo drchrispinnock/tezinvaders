@@ -55,7 +55,8 @@ The game also awards an extra life every 5,000 points.
 
 A game that starts without a ticket shows FREE PLAY for its first seconds, so nobody plays a
 whole game expecting it to count. Only implicit accounts (tz addresses) can hold tickets.
-
+Ticket holders' games are seeded by the chain (one seed per round, or per day in December), so a
+recording cannot be re-attested under another seed or kept for a later round.
 ## Score verification
 
 The browser never reports a bare score. The game simulation is deterministic given its seed

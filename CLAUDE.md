@@ -207,9 +207,8 @@ with `GET n`/`UPDATE n`: 1 admin, 3 entry_fee, 5 round, 7 pool, 9 round_ends (ti
 token id), 15 verifier (`key`, signs score attestations), 17 leader (`option (pair address
 nat)`, this round's top scorer), 19 scores (`big_map address nat`, this round's best per ticket
 holder), 21 champions (`map nat (pair address nat)`, round → winner), 23 best (`big_map address
-nat`, all-time best per player), 25 games (`big_map (pair player (pair seed purpose)) unit`,
-attested games already used: purpose 0 score, 1 Advent door), 27 ledger / 29 operators /
-31 token_metadata (FA2), 32 metadata (TZIP-16). Scores are a big map so a round can have any
+nat`, all-time best per player), 25 ledger / 27 operators / 29 token_metadata (FA2), 30 metadata
+(TZIP-16). Scores are a big map so a round can have any
 number of players; the frontend reads the table from TzKT (`readLeaderboard()`) and the
 contract never iterates it: the leader is tracked on every submit. `champions` is a plain map
 (one entry per round) read from storage.
@@ -221,7 +220,11 @@ it first runs the settlement below, so the ticket opens the next round), `submit
 (`((score, expires), (seed, proof))`; ticket holders only, before `round_ends`; `proof` must be
 the verifier's signature over `PACK (pair (pair chain_id self_address) (pair (pair sender score)
 (pair expires (pair round seed))))` with the contract's own round number, `NOW <= expires`, and
-`(sender, seed, 0)` not yet in `games` (else `GAME_USED`), so one recording is attested once; keeps the max; takes the lead when strictly higher than the
+`seed` equal to the chain-prescribed one (else `BAD_SEED`): `seed_for(round, 0)`, or inside the
+Advent window `seed_for(day, 1)`, where `seed_for(n, tag) = NAT (first 4 bytes of BLAKE2B (PACK
+(Pair (Pair self sender) (Pair n tag))))`, mirrored by `src/chain/seed.ts`; so every game in a
+round shares one RNG, a recording is worthless in any other round, and it cannot be re-attested
+under a seed of the player's choosing; keeps the max; takes the lead when strictly higher than the
 leader's score, so ties keep the earlier leader; when the player's all-time `best` rises it
 mints every badge whose threshold lies in (old best, new score]), `end_round` (admin at any
 time, anyone once `NOW >= round_ends`; runs the settlement: pays the full pool to the leader,
@@ -237,7 +240,7 @@ Advent calendar below),
 semi-fungible: token ids 0–4 (dollar 1000, euro 3000, pound 5000, yen 8000, mothership
 12000), minted at most once per player per id, freely transferable. Failures use string
 `FAILWITH`s (`BAD_FEE`, `NO_TICKET`, `NOT_ADMIN`, `NO_TEZ_ACCEPTED`, `ROUND_OVER`,
-`ROUND_RUNNING`, `BAD_LENGTH`, `BAD_PROOF`, `PROOF_EXPIRED`, `GAME_USED`, `IMPLICIT_ONLY`,
+`ROUND_RUNNING`, `BAD_LENGTH`, `BAD_PROOF`, `PROOF_EXPIRED`, `BAD_SEED`, `IMPLICIT_ONLY`,
 `ADVENT_*`, `UNPAYABLE_*`, `FA2_*`);
 `main.ts` extracts these from octez.js errors.
 
@@ -259,8 +262,9 @@ the large origination output made `echo` fail.
 
 From 1 to 25 December a ticket holder whose attested score that day is over 500 claims the
 day's FA2 token (ids `advent.first_token + day`, 100–124 for 2026), once per player per door.
-`claim_advent` takes the same `((score, expires), (seed, proof))` as `submit_score` (purpose 1 in
-`games`: one door per recording, but the same game can be used for a score and a door) and never touches
+`claim_advent` takes the same `((score, expires), (seed, proof))` as `submit_score`, with `seed`
+required to be `seed_for(day, 1)`; `submit_score` accepts that day seed too, so one December game
+counts for both the leaderboard and the door and never touches
 the pool or the leaderboard; the day comes from `NOW` against `advent.start` (storage field 13,
 set at origination from `src/chain/advent.ts`, movable with the admin's `set_advent (start,
 first_token)` for another year). The 25 token metadata entries are part of the initial storage
@@ -286,7 +290,10 @@ it POSTs `{chainId, contract, player, score, seed, log}` to `VITE_VERIFIER_URL/a
 ended with that score, and signs `PACK (pair (pair chain_id contract) (pair (pair player
 score) (pair expires (pair round seed))))` with its edsk: `expires` 15 minutes out, `round` as
 the client names it (the contract packs its own, so a stale proof fails), and the game's `seed`,
-which the contract remembers per player so a recording cannot be re-attested and replayed. The contract checks the signature against its `verifier` key.
+which the contract requires to be the chain-prescribed seed (`seed_for`, see the contract
+section), so a recording cannot be re-attested under another seed or banked for a later round.
+`main.ts` sets `Sim.nextSeed` from `prescribedSeed()` whenever the connected player holds a ticket
+(the day seed inside the Advent window, else the round seed); free play keeps random seeds. The contract checks the signature against its `verifier` key.
 `verifier/server.ts` is a plain Node server, `verifier/lambda.ts` the same behind a Lambda
 Function URL, reading its keys from the Secrets Manager secret in `VERIFIER_SECRET_ARN`
 (`deploy/verifier-secret.sh` writes it from `.env`; Quantumnet's ML-DSA key exceeds the Lambda
@@ -325,8 +332,9 @@ ML-DSA-44 one). `GET /key` lists them all.
   score in the simulation. A bot that plays the deterministic game perfectly gets a genuine
   attestation; rate limits and anti-bot heuristics are not in place. The verifier is a trusted
   service: whoever holds its key can sign any score (rotate with `set_verifier`). Replaying a
-  recording is closed off on chain (round and seed in the claim, `games` set), not at the
-  verifier, which stays stateless.
+  recording is closed off on chain (round and the chain-prescribed seed in the claim), not at the
+  verifier, which stays stateless. Within a round every game of a player uses the same seed, so
+  a canned input sequence that beats that seed is the bot case above.
 - Rounds settle lazily: the first ticket after the deadline pays out the old round. The backstop
   calls `end_round` through octez.js (`contract/scripts/call.ts`), because octez-client cannot
   speak to Quantumnet's protocol; `round-ends.ts` reads the deadline from the RPC storage JSON,

@@ -5,6 +5,7 @@ import { mergeLeader, readLeaderboard, readTokenIds, resolveAliases } from "./ch
 import { requestAttestation } from "./chain/verifier";
 import { encodeLog } from "./game/sim";
 import { adventDay } from "./chain/advent";
+import { SEED_TAG_DAY, SEED_TAG_ROUND, seedFor } from "./chain/seed";
 import { BADGES } from "./chain/badges";
 import { Wallet } from "./chain/wallet";
 import { Game } from "./game/Game";
@@ -46,6 +47,7 @@ if (onL2) document.querySelector<HTMLLinkElement>("link[rel=icon]")?.setAttribut
 function refreshPanel(): void {
   const me = state.address;
   game.staked = Boolean(me && state.badges?.ticket !== null && state.badges?.ticket !== undefined);
+  game.sim.nextSeed = prescribedSeed();
   panel.render(state);
 }
 
@@ -53,6 +55,18 @@ function setStatus(status: string, error = false): void {
   state.status = status;
   state.error = error;
   refreshPanel();
+}
+
+/**
+ * The seed the chain prescribes for the connected ticket holder's next game: today's Advent seed inside
+ * the calendar (one December game counts for the leaderboard and the door), else this round's.
+ * Free play (no wallet, no ticket) keeps random seeds; those games cannot be submitted anyway.
+ */
+function prescribedSeed(): number | null {
+  const me = state.address, st = state.storage;
+  if (!me || !st || !hasContract() || state.badges?.ticket === null || state.badges?.ticket === undefined) return null;
+  const day = adventDay(Date.now(), st.adventStart);
+  return day !== null ? seedFor(config.contractAddress, me, day, SEED_TAG_DAY) : seedFor(config.contractAddress, me, st.round, SEED_TAG_ROUND);
 }
 
 /** Thrown by an action to end with a custom (non-error) status line. */
@@ -79,11 +93,11 @@ async function run<T>(label: string, fn: () => Promise<T>): Promise<T | undefine
 /** A short, safe description of an error: the contract's FAILWITH code when there is one, else a fixed label (the raw text, which may come from a node or a wallet, goes to the console only). */
 function describe(err: unknown): string {
   const msg = err && typeof err === "object" && "message" in err ? String((err as { message: unknown }).message) : String(err);
-  const m = /with: \{"string":"([A-Z_]+)"\}/.exec(msg) ?? /"(BAD_FEE|NO_TICKET|NOT_ADMIN|NO_TEZ_ACCEPTED|ROUND_OVER|ROUND_RUNNING|BAD_LENGTH|BAD_PROOF|PROOF_EXPIRED|GAME_USED|IMPLICIT_ONLY|ADVENT_\w+|UNPAYABLE_\w+|FA2_\w+)"/.exec(msg);
+  const m = /with: \{"string":"([A-Z_]+)"\}/.exec(msg) ?? /"(BAD_FEE|NO_TICKET|NOT_ADMIN|NO_TEZ_ACCEPTED|ROUND_OVER|ROUND_RUNNING|BAD_LENGTH|BAD_PROOF|PROOF_EXPIRED|BAD_SEED|IMPLICIT_ONLY|ADVENT_\w+|UNPAYABLE_\w+|FA2_\w+)"/.exec(msg);
   if (m) return m[1]!;
   console.error(err);
   if (/pairing cancelled|aborted|rejected|cancel/i.test(msg)) return "cancelled in the wallet";
-  if (/replay scored|did not end|bad (seed|score|player|round)|input log/i.test(msg)) return msg.replace(/[<>&"']/g, "");
+  if (/^the verifier /.test(msg) || /^the game recording/.test(msg)) return msg;
   if (/Failed to fetch|NetworkError|timeout/i.test(msg)) return "network error";
   return "unexpected error (see the console)";
 }

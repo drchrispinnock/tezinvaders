@@ -14,25 +14,25 @@
     },
     {
       "name": "shadownet", "chain": "shadownet", "layer": "l1", "label": "Shadownet", "path": "/shadownet",
-      "chainId": "NetXsqzbfFenSTS", "rpcUrl": "https://rpc.shadownet.teztnets.com", "contractAddress": "KT1TRVkAGRxJnAYDFxHKAcZq6z2dNAJm9pVM",
+      "chainId": "NetXsqzbfFenSTS", "rpcUrl": "https://rpc.shadownet.teztnets.com", "contractAddress": "KT1EnW7cyVTkQvwAT9YcuXDZwFqMoJx8t9S3",
       "tzktApi": "https://api.shadownet.tzkt.io", "explorer": "https://shadownet.tzkt.io",
       "faucet": "https://faucet.shadownet.teztnets.com"
     },
     {
       "name": "tezosx-shadownet", "chain": "shadownet", "layer": "l2", "label": "Tezos X Shadownet", "path": "/shadownet/tezosx",
-      "chainId": "NetXtLrzvQDobza", "rpcUrl": "https://michelson.etherlink.shadownet.octez.io", "contractAddress": "KT1VhPwCsrRsbaTWhy86esaSCtwsXxqApiqs",
+      "chainId": "NetXtLrzvQDobza", "rpcUrl": "https://michelson.etherlink.shadownet.octez.io", "contractAddress": "KT19gZgwVt4ynQGxxCA5sMVTJbQgGUcrahLR",
       "tzktApi": "https://api.shadownet.etherlink.tzkt.io", "explorer": "https://shadownet.etherlink.tzkt.io"
     },
     {
       "name": "ushuaianet", "chain": "ushuaianet", "layer": "l1", "label": "Ushuaianet", "path": "/ushuaianet",
-      "chainId": "NetXpX8WSZkAZZA", "rpcUrl": "https://rpc.ushuaianet.teztnets.com", "contractAddress": "KT1DaU7DJnGV566Cwib97NrxCX3nBxJzuTSx",
+      "chainId": "NetXpX8WSZkAZZA", "rpcUrl": "https://rpc.ushuaianet.teztnets.com", "contractAddress": "KT1Njbfdc41o2gFydN7ucgBrm6dSveb6seJG",
       "tzktApi": "https://api.ushuaianet.tzkt.io", "explorer": "https://ushuaianet.tzkt.io",
       "faucet": "https://faucet.ushuaianet.teztnets.com"
     },
     {
       "name": "quantumnet", "chain": "quantumnet", "layer": "l1", "label": "Quantumnet", "path": "/quantumnet",
       "connectType": "custom",
-      "chainId": "NetXhb8apwTcVhJ", "rpcUrl": "https://quantumnet.pqpark.dal.nomadic-labs.com/rpc", "contractAddress": "KT1W7VCZveU4QXjW1TkY1yA7cxcWhUYYRWc1",
+      "chainId": "NetXhb8apwTcVhJ", "rpcUrl": "https://quantumnet.pqpark.dal.nomadic-labs.com/rpc", "contractAddress": "KT1TPtGrFK3N776CSQUk7Td5FXKL54xPJvDf",
       "tzktApi": "https://quantumnet-tzkt.pqpark.dal.nomadic-labs.com", "explorer": "https://quantumnet-tzkt.pqpark.dal.nomadic-labs.com",
       "faucet": "https://quantumnet-faucet.pqpark.dal.nomadic-labs.com"
     }
