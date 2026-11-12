@@ -80,7 +80,8 @@ body.l2 .panel h1 { color: var(--gold); }
 .touch-help { display: none; }
 canvas { touch-action: none; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
 @media (pointer: coarse) {
-  .touch { display: grid; grid-template-columns: 1fr 2fr 1fr; gap: 10px; width: 100%; max-width: 560px; }
+  /* Left and right side by side for the left thumb, fire on the right for the other. */
+  .touch { display: grid; grid-template-columns: 1fr 1fr 2fr; gap: 10px; width: 100%; max-width: 560px; }
   .touch button { font: inherit; font-size: 20px; min-height: 56px; background: var(--panel); color: var(--text); border: 2px solid var(--line); border-radius: 6px; touch-action: none; -webkit-user-select: none; user-select: none; }
   .touch button:active { background: var(--tez); color: #fff; border-color: var(--tez); }
   body.l2 .touch button:active { background: var(--gold); color: #111; border-color: var(--gold); }
