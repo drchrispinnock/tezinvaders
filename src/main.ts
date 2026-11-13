@@ -96,7 +96,7 @@ async function run<T>(label: string, fn: () => Promise<T>): Promise<T | undefine
 /** A short, safe description of an error: the contract's FAILWITH code when there is one, else a fixed label (the raw text, which may come from a node or a wallet, goes to the console only). */
 function describe(err: unknown): string {
   const msg = err && typeof err === "object" && "message" in err ? String((err as { message: unknown }).message) : String(err);
-  const m = /with: \{"string":"([A-Z_]+)"\}/.exec(msg) ?? /"(BAD_FEE|NO_TICKET|NOT_ADMIN|NO_TEZ_ACCEPTED|ROUND_OVER|ROUND_RUNNING|BAD_LENGTH|BAD_PROOF|PROOF_EXPIRED|BAD_SEED|IMPLICIT_ONLY|ADVENT_\w+|UNPAYABLE_\w+|FA2_\w+)"/.exec(msg);
+  const m = /with: \{"string":"([A-Z_]+)"\}/.exec(msg) ?? /"(BAD_FEE|NO_TICKET|NOT_ADMIN|NO_TEZ_ACCEPTED|ROUND_OVER|ROUND_RUNNING|BAD_LENGTH|BAD_PROOF|PROOF_EXPIRED|BAD_SEED|DAY_SEED_USED|IMPLICIT_ONLY|ADVENT_\w+|UNPAYABLE_\w+|FA2_\w+)"/.exec(msg);
   if (m) return m[1]!;
   console.error(err);
   if (/pairing cancelled|aborted|rejected|cancel/i.test(msg)) return "cancelled in the wallet";
