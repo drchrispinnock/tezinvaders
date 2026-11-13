@@ -59,6 +59,8 @@ Ticket holders' games are seeded by the chain (one seed per round, or per day in
 recording cannot be re-attested under another seed or kept for a later round.
 A game that spans midnight in December still counts, for the day it was seeded for, if it is
 submitted within half an hour.
+A December recording counts for the leaderboard in the round it was first scored in, and a door,
+once claimed, stays claimed even if the token is given away.
 ## Score verification
 
 The browser never reports a bare score. The game simulation is deterministic given its seed

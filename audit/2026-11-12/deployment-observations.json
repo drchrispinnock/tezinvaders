@@ -1,0 +1,32 @@
+{
+  "date": "2026-11-12",
+  "site": "https://tezinvaders.xyz/shadownet",
+  "cloudfrontDistribution": "EXG3G4877J7V",
+  "readMethods": ["public HTTPS HEAD/GET", "cloudfront:GetDistributionConfig", "lambda:GetPolicy"],
+  "cloudfront": {
+    "origin": "tezinvaders-site.s3.eu-west-1.amazonaws.com",
+    "originAccessControlId": "E2HGQ4716UPTT",
+    "viewerProtocolPolicy": "redirect-to-https",
+    "minimumTLSVersion": "TLSv1.2_2021",
+    "webACLId": "",
+    "additionalCacheBehaviors": 0
+  },
+  "responseHeaders": {
+    "strict-transport-security": "max-age=31536000; includeSubDomains",
+    "x-frame-options": "DENY",
+    "x-content-type-options": "nosniff",
+    "referrer-policy": "strict-origin-when-cross-origin",
+    "content-security-policy": null
+  },
+  "lambda": {
+    "function": "tezinvaders-verifier",
+    "region": "us-east-1",
+    "publicInvokeFunctionUrl": true,
+    "functionUrlAuthTypeCondition": "NONE",
+    "publicInvokeFunction": true,
+    "invokeFunctionCondition": null,
+    "concurrencyConfigurationInspected": false,
+    "deployedBundleCompared": false
+  },
+  "scopeNote": "Selected observations only; live S3 ACLs/bucket policies and account-wide IAM were not inspected."
+}

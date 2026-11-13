@@ -1,0 +1,262 @@
+TezInvaders security audit — 12 November 2026
+============================================
+
+Reviewed commit: 960da2d3b6d04ab8acdce9b0c08fb2b02d2b6631
+Scope: Michelson contract, deterministic game and replay verifier, wallet and UI
+flows, dependency advisories, deployment scripts and CloudFormation templates,
+plus selected read-only checks against the deployed services.
+
+Decision
+--------
+Keep this version on testnet until the score-verification and contract issues
+below are fixed. This review did not demonstrate an unauthenticated arbitrary
+withdrawal, a signature forgery, or exposure of a production signing key.
+However, the verifier can attest a score produced under a different seed from
+the seed it signs. This breaks a security condition used to award prize money.
+
+Mainnet and Tezos X Mainnet contract addresses are empty in the configuration.
+All four configured test-network contracts matched the local contract after
+parsing and expanding Michelson macros and excluding annotations:
+
+  Shadownet       KT1MtKcwp7jCwBfQc7EcdPXmf7BRGmtrnUKZ
+  Tezos X testnet KT1RR3Rhvo1wNp6iUdLYeqaPZmfLcCiNoYEP
+  Ushuaianet      KT1DmYtGanXdspFj3bdBzbz3oVsYwLHEzUva
+  Quantumnet      KT1U6qWXpxKZjkrdHupmfKpt33ikkiZr5E7P
+
+Findings
+--------
+
+1. HIGH: Restarting within a recording bypasses the prescribed game seed.
+   Confirmed locally through the real verifier signing path.
+
+   References: src/game/sim.ts:173, 211, 490;
+               verifier/attest.ts:102, 113.
+
+   replay() processes every input, even after the first game has ended. A start
+   input in gameover calls startGame() without a seed. The verifier's Sim has no
+   seedProvider, so the second game gets a fresh random seed. checkClaim() only
+   checks the final phase and score. attest() signs req.seed, without verifying
+   that the final game actually used it.
+
+   Local evidence: the same recording and outer seed 4242 produced final seeds
+   2970508495, 1265937797 and 1070152405, with scores 670, 600 and 630. Submitting
+   this recording repeatedly to the local signing path with a claimed score of
+   760 succeeded on attempt 9. The normal single-game control scored 730.
+   These checks used only the repository's public throwaway test key.
+
+   An attacker can prepend a losing game and restart to launder a recording
+   through different prescribed seeds, retrying until the claimed score matches
+   a random replay. This defeats deterministic seed binding and can affect the
+   leader and prize payout when the accepted score beats other players. It does
+   not allow an arbitrary score with no playable input, and a live prize theft
+   was not attempted or demonstrated.
+
+   Fix: enforce exactly one game per recording. Reject inputs after its first
+   terminal tick, prevent restart transitions during replay, and verify that
+   the final seed equals the supplied seed. Add regression checks for trailing
+   input, restarts, repeated identical requests, and seed preservation. Deploy
+   the corrected verifier and compatible client together.
+
+2. MEDIUM: Advent tokens can be minted repeatedly after transferring them out.
+   Confirmed with actual transactions on the local Octez mockup chain.
+
+   References: contract/tezinvaders.tz:343; transfer at line 244.
+
+   claim_advent uses the caller's current ledger balance as its already-claimed
+   flag. A successful FA2 transfer reduces that balance to zero, allowing the
+   original caller to use the exact same proof again. The proof is neither
+   consumed nor tracked independently of token ownership.
+
+   Local evidence: two claim-and-transfer cycles using one proof increased the
+   recipient's token-100 balance from 1 to 3; the claimant ended with balance 0.
+   An ordinary ticket holder can repeat this within the proof/day window, or
+   request another proof for the same recording. No administrator permission is
+   needed for the exploit; the test administrator only configured the fixture.
+
+   Impact: unbounded issuance from one eligible player/game; badge scarcity and
+   any downstream collectible value are compromised. This entrypoint does not
+   itself withdraw tez.
+
+   Fix: store a separate permanent claim flag keyed by player and token ID, or
+   by player/calendar/day. Transfers must not change it. The deployed contract
+   has no code-upgrade entrypoint, so a contract replacement is required.
+
+3. MEDIUM: Advent recordings are reusable across rounds.
+   Confirmed locally: the same normal recording was accepted in rounds 4 and 5.
+
+   References: src/chain/seed.ts:16; contract/tezinvaders.tz:159-180;
+               verifier/attest.ts:109.
+
+   The ordinary round seed changes with the round. The accepted Advent seed is
+   derived from contract, player, day index and tag, without the round or calendar
+   start/year. A player can obtain a fresh attestation for the same Advent log
+   and the next round, then submit it after buying that round's ticket, as long
+   as the day seed remains accepted. Old signatures fail correctly; fresh
+   signatures over the old recording are the problem. This is possible with
+   rounds spanning part of the same UTC day, and becomes more useful with short
+   rounds. Re-running a calendar also repeats the per-day seeds for that player.
+
+   Local evidence: one recording with day seed 2420984589 and score 640 was
+   re-attested by the real verifier code and submitted successfully in mockup
+   rounds 4 and 5. The administrator advanced the mockup round solely to avoid
+   waiting; the exploit needs only a normal round transition within the accepted
+   day window, plus a new ticket. This did not use the restart bug in finding 1.
+
+   This contradicts the stated guarantee that recordings cannot be kept for
+   later rounds. If daily reuse is intended, document it explicitly as part of
+   the prize rules. Otherwise bind the gameplay seed/session to both the round
+   and calendar identity, or separate a round proof from a daily badge proof.
+   Predictable seeds and offline bot optimization remain separate, documented
+   design limitations even after this and finding 1 are fixed.
+
+4. MEDIUM: The public verifier has an inexpensive compute-abuse path, and its
+   deployed IAM policy additionally permits direct Lambda invocation.
+
+   References: verifier/http.ts:25-37; verifier/attest.ts:22;
+               deploy/verifier-lambda.yml:33-71.
+
+   A request needs no wallet authentication, ticket, current-round check,
+   registered contract, or issued game session before replay begins. The body
+   limit is 4 MiB and the replay limit is one million ticks, but run-length
+   encoding means a tiny request can consume substantial CPU.
+
+   Local evidence: a 178-byte request with a million-tick recording consumed
+   approximately 697 ms on this machine before returning 422. This is a local
+   timing observation, not a Lambda benchmark or load test. Repetition could
+   consume AWS spend and verifier capacity, preventing legitimate scores from
+   being submitted before the on-chain deadline. Deployment templates contain
+   no application rate limiter or reserved concurrency setting. Live concurrency
+   quotas and billing controls were not inspected.
+
+   The live get-policy result also confirms Principal "*" for
+   lambda:InvokeFunction without lambda:InvokedViaFunctionUrl. This permits
+   other invocation methods for appropriately authorized AWS callers, in
+   addition to the intentionally public Function URL. It is unnecessary and
+   would undermine protections applied only to the URL path. It does not grant
+   access to the function code or signing secret by itself.
+
+   Fix: constrain InvokePermission using InvokedViaFunctionUrl: true. Put cheap
+   eligibility checks and enforceable quotas before expensive replay; consider
+   authenticated wallet challenges and per-player/round limits. Protect the
+   verifier endpoint itself and close any direct origin bypass. Concurrency
+   limits and cost alarms provide additional protection but do not substitute
+   for rate limiting. Restricting CORS alone is not access control.
+
+   AWS documents the missing invocation constraint here:
+   https://docs.aws.amazon.com/lambda/latest/dg/urls-auth.html
+
+5. LOW: Tez attached to non-payment entrypoints becomes unrecoverable surplus.
+   Confirmed on the local Octez mockup chain.
+
+   References: contract/tezinvaders.tz:95, 221, 244, 276, 287.
+
+   Only play adds AMOUNT to pool. submit_score and claim_advent reject attached
+   tez, but end_round, FA2 operations and administrator setters do not all do so.
+   Settlement pays the recorded pool, never the surplus balance, and there is
+   no surplus recovery entrypoint.
+
+   Local evidence: sending 1 tez to update_operators with an empty list succeeded.
+   The contract balance became 1 tez while pool remained zero.
+
+   Impact: an accidental attached payment is permanently inaccessible through
+   this contract. This does not let an attacker steal someone else's pool.
+   Fix: require AMOUNT = 0 on every entrypoint other than play, or add an explicit
+   donation/accounting mechanism if donations are intended. Do not add an
+   unrestricted administrator sweep of pool funds as a workaround.
+
+Fund-control trust assumptions
+-----------------------------
+The verifier is a trusted prize oracle. Whoever obtains its signing key can
+authorize fabricated scores for their own funded ticket, become leader and
+receive the pool when the round ends. Signature binding does not protect
+against the signing authority itself being compromised. Lambda code-update
+permission is therefore effectively authority over which scores win, even
+without direct Secrets Manager access. The default verifier key is shared
+across chains, expanding the impact of a compromise.
+
+The administrator can replace that key immediately, close a round early, and
+move the current deadline with set_round_length. Thus an administrator can
+install their own verifier, authorize a winning score and settle immediately,
+or repeatedly postpone settlement. These are privileged design powers, not
+an unauthenticated access-control bypass discovered by this audit.
+
+Before using valuable pools, decide whether these powers are acceptable and
+disclose them. Prefer an independently controlled multisig administrator,
+prospective configuration changes, restricted early-settlement authority,
+isolated production signing keys and tightly scoped deployment permissions.
+KMS-style non-exportable custody alone would not stop compromised authorized
+signing code from asking for malicious signatures.
+
+Other observations and hardening
+-------------------------------
+* champions is an ever-growing ordinary map (contract line 70), updated on each
+  nonempty settlement (line 91). Use a big_map, events/indexing, or bounded
+  history before long-term operation. Growing non-lazy storage can eventually
+  make calls exceed gas limits. Local synthetic runs with up to 20,000 entries
+  did not fail at gas 1,040,000; no failure threshold or imminent lock was
+  established. This is a structural lifetime risk, not a demonstrated immediate
+  outsider attack. Reference:
+  https://docs.tezos.com/developing/security/resource-constraints
+
+* TzKT aliases and status messages are escaped. However, returned address strings
+  are inserted directly into HTML attributes in src/ui/panel.ts:53-58, and the
+  indexer JSON is only TypeScript-cast in src/chain/tzkt.ts. Validate addresses
+  and use DOM text/attribute APIs. A malicious indexer response could otherwise
+  become same-origin script execution. Ordinary valid on-chain addresses cannot
+  contain the necessary markup; no normal-player stored-XSS path was established.
+
+* The live CloudFront response includes HSTS, DENY framing, nosniff and a referrer
+  policy. It has no Content-Security-Policy. Introduce a tested CSP compatible
+  with the wallet integration and external resources. Treat S3 upload, CDN
+  configuration, domain/DNS and dependency publishing permissions as sensitive:
+  replacing dApp JavaScript can change what users are asked to authorize.
+
+* The live CloudFront distribution uses S3 Origin Access Control, HTTPS redirects
+  and a TLS 1.2 minimum. No Web ACL is attached to that static distribution.
+  The S3 template enables all public-access blocks and limits bucket reads to
+  the CloudFront distribution. Live S3 policies/ACLs, account-wide IAM and the
+  Lambda execution role were not independently inspected.
+
+* npm audit reported 13 affected package entries (3 high, 10 low), with propagation
+  through the wallet SDK. These are not 13 independent exploit chains. The root
+  advisory records concern decode-uri-component denial of service and elliptic.
+  Reachability to fund theft was not established. Review an SDK-compatible update
+  or override; do not blindly apply npm audit's suggested major-version changes.
+  See dependency-audit.json for exact versions, ranges and advisory links.
+
+* No production verifier-secret value was found in tracked files or the three
+  local built JS/HTML/JSON files scanned. The two secret-looking tracked files
+  were test fixtures and did not match the local production secret values.
+  This check does not establish that git history, old S3 objects, logs, backups,
+  IAM identities or other machines have never exposed a key.
+
+Validation and limits
+---------------------
+* Existing JavaScript tests: 36 passed in 11 files. TypeScript typecheck passed.
+* Existing contract suite: 120 passed, 0 failed, using a local Octez mockup.
+  macOS system Bash failed on the script's empty-array handling; Homebrew Bash
+  successfully ran it. This shell issue was not a contract failure.
+* Additional local reproductions: multi-game replay signing, repeated Advent
+  issuance, unaccounted tez and cross-round Advent recording reuse. The
+  accompanying scripts use public test keys and the local mockup only.
+* Live checks were reads: deployed contract code, site response headers/HTML,
+  verifier public keys, CloudFront distribution configuration and Lambda policy.
+* No live transactions, live exploit submissions, stress tests, AWS changes,
+  contract deployments or application fixes were performed.
+* The live Lambda bundle was not downloaded or compared to the reviewed source.
+  Source findings are therefore not a claim of verified Lambda binary identity.
+* This is a focused code and configuration review, not a formal proof or an
+  exhaustive audit of the AWS account, wallet software, dependencies or protocol.
+
+Recommended order
+-----------------
+1. Fix and regression-test one-game replay before enabling valuable pools.
+2. Replace the contract with persistent Advent claim tracking, complete amount
+   guards and the intended cross-round freshness rule; update client addresses.
+   Settle existing pools normally before migration.
+3. Narrow the Lambda invoke policy and add verifier abuse controls.
+4. Decide and constrain the administrator/verifier trust model, then address
+   dependency, DOM, CSP and storage-lifetime hardening.
+
+Application source and live deployment were left unchanged. The audit directory
+contains review material and local reproductions only.

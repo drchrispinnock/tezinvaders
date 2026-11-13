@@ -35,18 +35,28 @@ describe("recording and replay", () => {
     expect(game.phase).toBe("gameover");
     expect(game.score).toBeGreaterThan(0);
     expect(game.log.length).toBeGreaterThan(100);
-    const again = replay(game.seed, decodeLog(encodeLog(game.log)));
+    const { sim: again, consumed } = replay(game.seed, decodeLog(encodeLog(game.log)));
     expect(again.phase).toBe("gameover");
     expect(again.score).toBe(game.score);
     expect(again.wave).toBe(game.wave);
+    expect(consumed).toBe(game.log.length);
   });
 
   it("a different seed or a tampered log gives a different game", () => {
     const game = playGame(777);
-    const other = replay(778, game.log);
-    const tampered = replay(777, game.log.slice(0, -200));
+    const other = replay(778, game.log).sim;
+    const tampered = replay(777, game.log.slice(0, -200)).sim;
     expect(other.score === game.score && other.phase === game.phase && other.log.length === game.log.length).toBe(false);
     expect(tampered.phase).not.toBe("gameover");
+  });
+
+  it("replays one game only: a restart hidden after game over is never stepped", () => {
+    const game = playGame(31337);
+    const padded = [...game.log, 0, 0, 8, ...game.log]; // wait, press start, play again
+    const { sim, consumed } = replay(game.seed, padded);
+    expect(consumed).toBe(game.log.length);
+    expect(sim.seed).toBe(game.seed);
+    expect(sim.score).toBe(game.score);
   });
 
   it("stops recording at game over and starts afresh with the next game", () => {

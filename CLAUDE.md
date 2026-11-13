@@ -52,7 +52,8 @@ and the wallet identifies the network by `rpcUrl`, as Quantumnet does, whose RPC
 the wallet's own entry for it; `faucet` is optional and shown in the panel) and `npm run contract:deploy-network -- <name>`, which refuses to run until the admin
 holds tez there, originates, waits for the network's TzKT to index the KT1 and writes it into
 the JSON; then redeploy the site. It originates through `contract/scripts/originate.ts` (octez.js with
-the admin's unencrypted key read from octez-client's wallet file), because octez-client cannot
+the admin's unencrypted key read from octez-client's wallet file; the verifier bundles
+`networks.json`, so redeploy the Lambda after changing any contract address), because octez-client cannot
 talk to a protocol it was not built with: Quantumnet runs Alpha. michel-codec only parses a
 top-level `Pair …` literal when parenthesised, hence `(${init})` there. Quantumnet also
 enforces `quantum_resistance_enable`: an ed25519 `key` is ill-typed data, so its contract holds
@@ -208,13 +209,15 @@ with `GET n`/`UPDATE n`: 1 admin, 3 entry_fee, 5 round, 7 pool, 9 round_ends (ti
 token id), 15 verifier (`key`, signs score attestations), 17 leader (`option (pair address
 nat)`, this round's top scorer), 19 scores (`big_map address nat`, this round's best per ticket
 holder), 21 champions (`map nat (pair address nat)`, round → winner), 23 best (`big_map address
-nat`, all-time best per player), 25 ledger / 27 operators / 29 token_metadata (FA2), 30 metadata
-(TZIP-16). Scores are a big map so a round can have any
+nat`, all-time best per player), 25 advent_days (`big_map (pair player day) (pair round door)`: for
+each December day a player used, the round its seed first scored in and whether its door is
+claimed), 27 ledger / 29 operators / 31 token_metadata (FA2), 32 metadata (TZIP-16). Scores are a big map so a round can have any
 number of players; the frontend reads the table from TzKT (`readLeaderboard()`) and the
 contract never iterates it: the leader is tracked on every submit. `champions` is a plain map
 (one entry per round) read from storage.
 
-Entrypoints: `play` (pay exactly `entry_fee`; implicit accounts only, `SENDER = SOURCE`, since a
+Entrypoints: `play` (pay exactly `entry_fee`; every other entrypoint refuses attached tez with
+`NO_TEZ_ACCEPTED`, so nothing can become unaccounted surplus; implicit accounts only, `SENDER = SOURCE`, since a
 contract that refuses tez as the leader would make every settlement revert and trap the pool;
 inserts the sender with score 0, who leads the round if nobody does yet; once `round_ends` has passed
 it first runs the settlement below, so the ticket opens the next round), `submit_score`
@@ -226,7 +229,9 @@ Advent window today's `seed_for(day, 1)`, or yesterday's within the first 1800 s
 that spanned midnight); `seed_for(n, tag) = NAT (first 4 bytes of BLAKE2B (PACK (Pair (Pair self
 sender) (Pair n tag))))` is a second `LAMBDA` kept under `settle` on the stack and mirrored by
 `src/chain/seed.ts`; so every game in a round shares one RNG, a recording is worthless in any
-other round, and it cannot be re-attested under a seed of the player's choosing; keeps the max; takes the lead when strictly higher than the
+other round, and it cannot be re-attested under a seed of the player's choosing. A day seed
+counts for the leaderboard in one round only: `advent_days` records the round, and the same day
+seed in a later round fails `DAY_SEED_USED`; keeps the max; takes the lead when strictly higher than the
 leader's score, so ties keep the earlier leader; when the player's all-time `best` rises it
 mints every badge whose threshold lies in (old best, new score]), `end_round` (admin at any
 time, anyone once `NOW >= round_ends`; runs the settlement: pays the full pool to the leader,
@@ -242,7 +247,8 @@ Advent calendar below),
 semi-fungible: token ids 0–4 (dollar 1000, euro 3000, pound 5000, yen 8000, mothership
 12000), minted at most once per player per id, freely transferable. Failures use string
 `FAILWITH`s (`BAD_FEE`, `NO_TICKET`, `NOT_ADMIN`, `NO_TEZ_ACCEPTED`, `ROUND_OVER`,
-`ROUND_RUNNING`, `BAD_LENGTH`, `BAD_PROOF`, `PROOF_EXPIRED`, `BAD_SEED`, `IMPLICIT_ONLY`,
+`ROUND_RUNNING`, `BAD_LENGTH`, `BAD_PROOF`, `PROOF_EXPIRED`, `BAD_SEED`, `DAY_SEED_USED`,
+`IMPLICIT_ONLY`,
 `ADVENT_*`, `UNPAYABLE_*`, `FA2_*`);
 `main.ts` extracts these from octez.js errors.
 
@@ -267,7 +273,8 @@ day's FA2 token (ids `advent.first_token + day`, 100–124 for 2026), once per p
 `claim_advent` takes the same `((score, expires), (seed, proof))` as `submit_score`, with `seed`
 required to be `seed_for(day, 1)` for today's door, or, within the first 1800 s of a day,
 `seed_for(day - 1, 1)` which opens yesterday's door (a game that spanned midnight; one game, one
-door); `submit_score` accepts the same day seeds, so one December game counts for both the
+door). The claimed flag lives in `advent_days`, not the ledger balance, so giving a door away does
+not let it be claimed again; `submit_score` accepts the same day seeds, so one December game counts for both the
 leaderboard and the door and never touches
 the pool or the leaderboard; the day comes from `NOW` against `advent.start` (storage field 13,
 set at origination from `src/chain/advent.ts`, movable with the admin's `set_advent (start,
@@ -290,7 +297,12 @@ restarted in `startGame`) and the input on each tick, which it records in `Sim.l
 `encodeLog`/`decodeLog` are the run-length text form; `replay(seed, log)` rebuilds the game).
 `main.ts` keeps the finished game as `pendingGame` beside `pendingScore`; on "Submit score"
 it POSTs `{chainId, contract, player, score, seed, log}` to `VITE_VERIFIER_URL/attest`
-(`src/chain/verifier.ts`), and the verifier (`verifier/attest.ts`) replays the log, checks it
+(`src/chain/verifier.ts`), and the verifier (`verifier/attest.ts`) first checks the claim names a
+configured contract and a player who holds a ticket there (`checkEligibility`, via TzKT, so
+anonymous callers cannot spend its compute; the Lambda also has reserved concurrency of 10 and
+its invoke permission is limited to calls through the function URL), then replays the log as
+exactly one game (`replay()` stops at game over and the verifier requires the log to end there,
+under the signed seed: a restart hidden in a recording cannot run under another seed), checks it
 ended with that score, and signs `PACK (pair (pair chain_id contract) (pair (pair player
 score) (pair expires (pair round seed))))` with its edsk: `expires` 15 minutes out, `round` as
 the client names it (the contract packs its own, so a stale proof fails), and the game's `seed`,

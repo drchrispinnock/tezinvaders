@@ -1,31 +1,33 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { aliasOf, clearAliasCache, mergeLeader, resolveAliases } from "./tzkt";
 
+const A = "tz1N29q5T3jJ2i1JEWHax7q1NRkDMADj6fof", B = "tz1gUCWWwmwEpc7eVd4NHy3UhL28K4j9L6jy", C = "tz1hr6Dvx4i686RFishFTWPeby949bjrV9KF";
 const reply = (body: unknown, ok = true) => ({ ok, json: async () => body }) as unknown as Response;
 
 describe("resolveAliases", () => {
   afterEach(clearAliasCache);
 
   it("names the addresses TzKT knows and remembers the rest as unnamed", async () => {
-    const fetchFn = vi.fn(async (_url: string | URL | Request) => reply([{ address: "tz1a", alias: "Ms BLS" }, { address: "tz1b", alias: null }]));
-    expect(await resolveAliases(["tz1a", "tz1b", "tz1c", "tz1a"], fetchFn)).toBe(true);
+    const fetchFn = vi.fn(async (_url: string | URL | Request) => reply([{ address: A, alias: "Ms BLS" }, { address: B, alias: null }, { address: "tz1nope", alias: "<b>x</b>" }]));
+    expect(await resolveAliases([A, B, C, A], fetchFn)).toBe(true);
     expect(fetchFn).toHaveBeenCalledTimes(1);
-    expect(String(fetchFn.mock.calls[0]?.[0])).toContain("address.in=tz1a,tz1b,tz1c");
-    expect(aliasOf("tz1a")).toBe("Ms BLS");
-    expect(aliasOf("tz1b")).toBeUndefined();
-    expect(aliasOf("tz1c")).toBeUndefined();
+    expect(String(fetchFn.mock.calls[0]?.[0])).toContain(`address.in=${A},${B},${C}`);
+    expect(aliasOf(A)).toBe("Ms BLS");
+    expect(aliasOf(B)).toBeUndefined();
+    expect(aliasOf(C)).toBeUndefined();
+    expect(aliasOf("tz1nope")).toBeUndefined(); // malformed addresses from the indexer are ignored
     // Everything is cached now: no second request.
-    expect(await resolveAliases(["tz1a", "tz1c"], fetchFn)).toBe(false);
+    expect(await resolveAliases([A, C], fetchFn)).toBe(false);
     expect(fetchFn).toHaveBeenCalledTimes(1);
   });
 
   it("leaves addresses unresolved when TzKT fails, so they are retried later", async () => {
     const failing = vi.fn(async (_url: string | URL | Request) => { throw new Error("offline"); });
-    expect(await resolveAliases(["tz1a"], failing)).toBe(false);
-    expect(aliasOf("tz1a")).toBeUndefined();
-    const working = vi.fn(async (_url: string | URL | Request) => reply([{ address: "tz1a", alias: "boot1" }]));
-    expect(await resolveAliases(["tz1a"], working)).toBe(true);
-    expect(aliasOf("tz1a")).toBe("boot1");
+    expect(await resolveAliases([A], failing)).toBe(false);
+    expect(aliasOf(A)).toBeUndefined();
+    const working = vi.fn(async (_url: string | URL | Request) => reply([{ address: A, alias: "boot1" }]));
+    expect(await resolveAliases([A], working)).toBe(true);
+    expect(aliasOf(A)).toBe("boot1");
   });
 });
 

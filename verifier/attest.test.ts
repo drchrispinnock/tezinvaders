@@ -95,3 +95,31 @@ describe("post-quantum players", () => {
     expect(attestationBytes({ chainId: "NetXhb8apwTcVhJ", contract: "KT1SoXm3n9eds9eQXRFkTUTY8cq3UvkriYmo", player: tz5, score: 60, expires: 1700000000, round: 1, seed: 0 }).length).toBeGreaterThan(100);
   });
 });
+
+describe("one game per recording", () => {
+  it("refuses a recording that restarts after game over, however many times it is asked", async () => {
+    // A losing game, then a start press and a second game: before the fix the second game ran under a
+    // random seed, so repeated requests eventually matched a lucky score.
+    const g = game(4242);
+    const log = `${g.log},0*20000,8*1,${g.log}`;
+    const req: AttestRequest = { chainId: CHAIN, contract: KT, player: TZ, score: g.score, round: 1, seed: g.seed, log };
+    for (let i = 0; i < 5; i++) expect(checkClaim(req)).toBe("input after the game ended");
+    expect(checkClaim({ ...req, log: `${g.log},0*3` })).toBe("input after the game ended");
+    expect(checkClaim({ ...req, log: g.log })).toBeNull();
+  });
+});
+
+describe("eligibility before replay", () => {
+  const nets = [{ chainId: CHAIN, contractAddress: KT, tzktApi: "https://tzkt.test" }];
+  const fake = (status: number, body: unknown = null) => (async () => ({ status, ok: status < 300, json: async () => body })) as unknown as typeof fetch;
+  it("refuses unknown contracts and ticketless players without replaying, and lets ticket holders through", async () => {
+    const g = game(11);
+    const req: AttestRequest = { chainId: CHAIN, contract: KT, player: TZ, score: g.score, round: 1, seed: g.seed, log: g.log };
+    await expect(attest(SK, { ...req, contract: "KT1SoXm3n9eds9eQXRFkTUTY8cq3UvkriYmo" }, Date.now(), { networks: nets, fetchFn: fake(200, true) })).rejects.toThrow("unknown chain or contract");
+    await expect(attest(SK, req, Date.now(), { networks: nets, fetchFn: fake(204) })).rejects.toThrow("no ticket");
+    await expect(attest(SK, req, Date.now(), { networks: nets, fetchFn: fake(200, false) })).rejects.toThrow("no ticket");
+    expect((await attest(SK, req, Date.now(), { networks: nets, fetchFn: fake(200, true) })).proof.startsWith("edsig")).toBe(true);
+    // an indexer outage does not lock honest players out
+    expect((await attest(SK, req, Date.now(), { networks: nets, fetchFn: fake(503) })).score).toBe(g.score);
+  });
+});

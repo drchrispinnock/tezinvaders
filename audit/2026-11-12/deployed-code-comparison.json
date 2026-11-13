@@ -1,0 +1,23 @@
+{
+  "commit": "960da2d3b6d04ab8acdce9b0c08fb2b02d2b6631",
+  "comparison": "expanded Micheline with annotations excluded",
+  "localSHA256": "1f34a1954f8b25cf928a68c83b0e68c8b81f5112385e1fc528bdb2a07ce2c1e4",
+  "networks": {
+    "shadownet": {
+      "matches": true,
+      "sha256": "1f34a1954f8b25cf928a68c83b0e68c8b81f5112385e1fc528bdb2a07ce2c1e4"
+    },
+    "tezosx": {
+      "matches": true,
+      "sha256": "1f34a1954f8b25cf928a68c83b0e68c8b81f5112385e1fc528bdb2a07ce2c1e4"
+    },
+    "ushuaianet": {
+      "matches": true,
+      "sha256": "1f34a1954f8b25cf928a68c83b0e68c8b81f5112385e1fc528bdb2a07ce2c1e4"
+    },
+    "quantumnet": {
+      "matches": true,
+      "sha256": "1f34a1954f8b25cf928a68c83b0e68c8b81f5112385e1fc528bdb2a07ce2c1e4"
+    }
+  }
+}

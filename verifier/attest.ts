@@ -18,8 +18,8 @@ const { InMemorySigner } = signer;
 import { decodeLog, replay } from "../src/game/sim.ts";
 
 export const ATTESTATION_TTL_S = 15 * 60;
-/** Longest game the verifier will replay: 1,000,000 ticks is about 4.6 hours at 60 Hz. */
-export const MAX_TICKS = 1_000_000;
+/** Longest game the verifier will replay: 300,000 ticks is about 83 minutes at 60 Hz. */
+export const MAX_TICKS = 300_000;
 
 export interface Claim {
   chainId: string;
@@ -54,6 +54,26 @@ export interface Attestation {
 }
 
 export class ClaimError extends Error {}
+
+/** What the verifier knows about a chain: the one contract it attests for, and where to check tickets. */
+export interface KnownNetwork { chainId: string; contractAddress: string; tzktApi: string }
+
+/**
+ * Cheap eligibility checks before the (expensive) replay: the claim must name a configured contract
+ * for its chain, and the player must hold a ticket there (a key in the scores big map, via TzKT).
+ * Keeps anonymous callers from spending the verifier's compute. Returns the reason to refuse, or null.
+ */
+export async function checkEligibility(req: AttestRequest, networks: readonly KnownNetwork[], fetchFn: typeof fetch): Promise<string | null> {
+  const net = networks.find((n) => n.chainId === req.chainId && n.contractAddress && n.contractAddress === req.contract);
+  if (!net) return "unknown chain or contract";
+  try {
+    const res = await fetchFn(`${net.tzktApi}/v1/contracts/${net.contractAddress}/bigmaps/scores/keys/${req.player}?select=active`);
+    if (res.status === 204 || res.status === 404) return "no ticket";
+    if (!res.ok) return null;                       // indexer trouble must not block honest players
+    const active = await res.json();
+    return active === false ? "no ticket" : null;
+  } catch { return null; }
+}
 
 const ATTESTATION_TYPE: MichelsonType = {
   prim: "pair",
@@ -99,14 +119,24 @@ export function checkClaim(req: AttestRequest): string | null {
   if (typeof req.log !== "string") return "bad input log";
   let log: number[];
   try { log = decodeLog(req.log, MAX_TICKS); } catch (e) { return (e as Error).message; }
-  const sim = replay(req.seed, log);
+  // Exactly one game: it must end on the last input, under the seed that is signed. replay() stops
+  // stepping at game over, so a restart smuggled into the log can neither run nor change the seed.
+  const { sim, consumed } = replay(req.seed, log);
   if (sim.phase !== "gameover") return "the game did not end";
+  if (consumed !== log.length) return "input after the game ended";
+  if (sim.seed !== req.seed) return "the game changed seed";
   if (sim.score !== req.score) return `the replay scored ${sim.score}, not ${req.score}`;
   return null;
 }
 
 /** Verify the request and sign it. Throws ClaimError when the claim does not hold. */
-export async function attest(secretKey: string, req: AttestRequest, now = Date.now()): Promise<Attestation> {
+export async function attest(secretKey: string, req: AttestRequest, now = Date.now(), eligibility?: { networks: readonly KnownNetwork[]; fetchFn: typeof fetch }): Promise<Attestation> {
+  // Cheap format checks first, then the eligibility lookups, then the replay.
+  if (!CHAIN_ID.test(req.chainId) || !/^KT1[1-9A-HJ-NP-Za-km-z]{33}$/.test(req.contract) || !ADDRESS.test(req.player)) throw new ClaimError("bad chain, contract or player");
+  if (eligibility) {
+    const refusal = await checkEligibility(req, eligibility.networks, eligibility.fetchFn);
+    if (refusal) throw new ClaimError(refusal);
+  }
   const reason = checkClaim(req);
   if (reason) throw new ClaimError(reason);
   const expires = Math.floor(now / 1000) + ATTESTATION_TTL_S;

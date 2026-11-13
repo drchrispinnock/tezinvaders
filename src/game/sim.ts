@@ -486,10 +486,19 @@ export function decodeLog(text: string, maxTicks = 1_000_000): number[] {
   return log;
 }
 
-/** Replay a recorded game from its seed. The result's phase is "gameover" when the log ran to the end of a game. */
-export function replay(seed: number, log: readonly number[]): Sim {
+/**
+ * Replay a recorded game from its seed: exactly one game. Stepping stops at game over, so a start
+ * input hidden in the log cannot begin a second game under another seed; `consumed` says how many
+ * inputs were used, and a verifier requires it to equal the log length (no input after the end).
+ */
+export function replay(seed: number, log: readonly number[]): { sim: Sim; consumed: number } {
   const sim = new Sim();
   sim.startGame(seed);
-  for (const code of log) sim.step(decodeInput(code));
-  return sim;
+  let consumed = 0;
+  for (const code of log) {
+    sim.step(decodeInput(code));
+    consumed++;
+    if (sim.phase === "gameover") break;
+  }
+  return { sim, consumed };
 }

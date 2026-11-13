@@ -23,10 +23,10 @@ expect_ok()   { out="$(tc "${@:2}")"; if [[ "$out" == *successfully* || "$out" =
 expect_fail() { out="$(tc "${@:3}")"; if [[ "$out" == *"$2"* ]]; then ok "$1 (rejected: $2)"; else bad "$1" "$out"; fi; }
 storage()     { tc get contract storage for "${1:-tezinvaders}" | tr -s ' \n' ' '; }
 balance()     { tc get balance for "$1" | awk '{print $1}'; }
-# Big map ids are the last six numbers of the storage: scores, best, ledger, operators, token_metadata, metadata.
+# Big map ids are the last seven numbers of the storage: scores, best, advent_days, ledger, operators, token_metadata, metadata.
 # The scores id follows the leader (None / Some …); the champions map in between may span several words.
 bigmap_id()   { if [ "$1" = 1 ]; then storage "${2:-tezinvaders}" | sed -E 's/\(Some \(Pair "[^"]*" [0-9]+\)\)/None/' | awk '{for(i=1;i<=NF;i++) if($i=="None"){print $(i+1); exit}}';
-                else storage "${2:-tezinvaders}" | awk -v n="$1" '{print $(NF-6+n)}'; fi; }
+                else storage "${2:-tezinvaders}" | awk -v n="$1" '{print $(NF-7+n)}'; fi; }
 # This round's score of $1; empty when they hold no ticket.
 score_of()    { local h; h=$(tc hash data "\"$1\"" of type address | awk '/^Script-expression-ID-Hash/{print $2}');
                 tc get element "$h" of big map "$(bigmap_id 1 "${2:-tezinvaders}")" | grep -o '^[0-9][0-9]*'; }
@@ -45,7 +45,7 @@ claim_fail()  { local s; s=${SEED:-$(seed_for "$4" "$DAY" 1 "${6:-tezinvaders}")
 submit_fail() { local s; s=${SEED:-$(round_seed "$4" "${6:-tezinvaders}")}; expect_fail "$1" "$2" transfer 0 from "$3" to "${6:-tezinvaders}" --entrypoint submit_score --arg "Pair (Pair $5 ${7:-$FAR}) (Pair $s \"$(proof "$4" "$5" "${7:-$FAR}" "${6:-tezinvaders}" "$s")\")" --burn-cap 1; }
 # Balance of ($1 token $2) in the ledger; prints 0 when the key is absent.
 ledger()      { local h; h=$(tc hash data "Pair \"$1\" $2" of type 'pair address nat' | awk '/^Script-expression-ID-Hash/{print $2}');
-                tc get element "$h" of big map "$(bigmap_id 3 "${3:-tezinvaders}")" | grep -o '^[0-9][0-9]*' || echo 0; }
+                tc get element "$h" of big map "$(bigmap_id 4 "${3:-tezinvaders}")" | grep -o '^[0-9][0-9]*' || echo 0; }
 expect_bal()  { b=$(ledger "$2" "$3"); [ "$b" = "$4" ] && ok "$1 (balance $b)" || bad "$1" "expected $4, got '$b'"; }
 
 ADMIN=bootstrap1; P1=bootstrap2; P2=bootstrap3; P3=bootstrap4
@@ -156,8 +156,12 @@ DAY=2; claim_fail "an hour after midnight yesterday's seed is refused" BAD_SEED 
 SEED=$(seed_for "$p1_addr" 2 1); submit_fail "and it no longer counts for the leaderboard" BAD_SEED $P1 "$p1_addr" 5300; SEED=""
 expect_ok   "calendar back to today being door 1" transfer 0 from $ADMIN to tezinvaders --entrypoint set_advent --arg "Pair 0 100" --burn-cap 1
 DAY=0; SEED=$(seed_for "$p2_addr" 0 1); submit_ok "a game played with today's door seed also counts for the leaderboard" $P2 "$p2_addr" 5100; SEED=""
+SEED=$(seed_for "$p2_addr" 0 1); submit_ok "and may be improved on in the same round" $P2 "$p2_addr" 5150; SEED=""
 expect_ok   "P1 gives door 1 to P3" transfer 0 from $P1 to tezinvaders --entrypoint transfer --arg "$(tx "$p1_addr" "$p3_addr" 100 1)" --burn-cap 1
 expect_bal "P3 holds door 1" "$p3_addr" 100 1
+expect_bal "P1 no longer holds door 1" "$p1_addr" 100 0
+expect_ok   "calendar back to today being door 1 (for the re-claim check)" transfer 0 from $ADMIN to tezinvaders --entrypoint set_advent --arg "Pair 0 100" --burn-cap 1
+DAY=0; claim_fail "P1 cannot claim door 1 again after giving it away" ADVENT_CLAIMED $P1 "$p1_addr" 650
 
 echo "end_round"
 expect_fail "non-admin cannot end a running round" ROUND_RUNNING transfer 0 from $P1 to tezinvaders --entrypoint end_round --burn-cap 1
@@ -180,6 +184,8 @@ expect_bal "P2 earned the yen badge" "$p2_addr" 3 1
 expect_bal "P2 did not get a second euro badge" "$p2_addr" 1 1
 
 echo "round housekeeping"
+expect_fail "tez attached to update_operators is refused" NO_TEZ_ACCEPTED transfer 1 from $P3 to tezinvaders --entrypoint update_operators --arg "{}" --burn-cap 1
+expect_fail "tez attached to end_round is refused" NO_TEZ_ACCEPTED transfer 1 from $ADMIN to tezinvaders --entrypoint end_round --burn-cap 1
 rs2=$(round_seed "$p2_addr")   # round 2 now
 expect_ok   "admin sets fee to 0.25 tez" transfer 0 from $ADMIN to tezinvaders --entrypoint set_entry_fee --arg 250000 --burn-cap 1
 expect_fail "non-admin cannot set round length" NOT_ADMIN transfer 0 from $P1 to tezinvaders --entrypoint set_round_length --arg 3600 --burn-cap 1
@@ -203,7 +209,7 @@ info=$(node "$HERE/storage.ts" --token-info 0 --image-base https://example.org/b
 expect_fail "non-admin cannot change token metadata" NOT_ADMIN transfer 0 from $P1 to tezinvaders --entrypoint set_token_metadata --arg "Pair 0 $info" --burn-cap 1
 expect_ok   "admin repoints badge 0" transfer 0 from $ADMIN to tezinvaders --entrypoint set_token_metadata --arg "Pair 0 $info" --burn-cap 1
 h=$(tc hash data 0 of type nat | awk '/^Script-expression-ID-Hash/{print $2}')
-tm=$(tc get element "$h" of big map "$(bigmap_id 5)" | tr -d ' \n')
+tm=$(tc get element "$h" of big map "$(bigmap_id 6)" | tr -d ' \n')
 echo "$tm" | grep -q "$(printf 'https://example.org/badges/dollar.svg' | xxd -p | tr -d '\n')" && ok "token 0 metadata now names example.org" || bad "token metadata" "$tm"
 expect_ok   "P2 can still transfer badge 0" transfer 0 from $P2 to tezinvaders --entrypoint transfer --arg "$(tx "$p2_addr" "$p3_addr" 0 1)" --burn-cap 1
 
@@ -231,6 +237,17 @@ echo "$s" | grep -q " 2 1000000 \"1970-01-08T00:00:01Z\" $WEEK (Pair \"1970-01-0
 submit_ok   "P1 scores in the new round" $P1 "$p1_addr" 10 stale
 expect_fail "a proof for another contract" BAD_PROOF transfer 0 from $P1 to stale --entrypoint submit_score --arg "Pair (Pair 20 $FAR) (Pair $rs1 \"$(proof "$p1_addr" 20 $FAR tezinvaders "$rs1")\")" --burn-cap 1
 expect_fail "the new round cannot be ended early by a player" ROUND_RUNNING transfer 0 from $P3 to stale --entrypoint end_round --burn-cap 1
+
+echo "a December recording is good for one round only"
+expect_ok   "calendar: today is door 1" transfer 0 from $ADMIN to tezinvaders --entrypoint set_advent --arg "Pair 0 100" --burn-cap 1
+expect_ok   "admin ends the round" transfer 0 from $ADMIN to tezinvaders --entrypoint end_round --burn-cap 1
+expect_ok   "P3 buys a ticket" transfer 0.25 from $P3 to tezinvaders --entrypoint play --burn-cap 1
+DAY=0; SEED=$(seed_for "$p3_addr" 0 1); submit_ok "P3 scores with today's door seed" $P3 "$p3_addr" 700; SEED=""
+SEED=$(seed_for "$p3_addr" 0 1); submit_ok "and improves on it in the same round" $P3 "$p3_addr" 750; SEED=""
+expect_ok   "admin ends the round again" transfer 0 from $ADMIN to tezinvaders --entrypoint end_round --burn-cap 1
+expect_ok   "P3 buys a ticket in the next round" transfer 0.25 from $P3 to tezinvaders --entrypoint play --burn-cap 1
+SEED=$(seed_for "$p3_addr" 0 1); submit_fail "the same day-seed recording is refused in the next round" DAY_SEED_USED $P3 "$p3_addr" 760; SEED=""
+submit_ok   "a round-seed game is fine" $P3 "$p3_addr" 100
 
 echo
 echo "$pass passed, $fail failed"

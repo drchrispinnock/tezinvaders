@@ -39,6 +39,8 @@ Resources:
       Role: !GetAtt Role.Arn
       MemorySize: 512
       Timeout: 30
+      # Caps what an anonymous caller can make the verifier spend; eligibility checks run before any replay.
+      ReservedConcurrentExecutions: 10
       Environment:
         Variables:
           VERIFIER_SECRET_ARN: !Ref VerifierSecretArn
@@ -62,13 +64,14 @@ Resources:
       Action: lambda:InvokeFunctionUrl
       Principal: "*"
       FunctionUrlAuthType: NONE
-  # Public function URLs need the plain invoke permission too.
+  # Public function URLs need the plain invoke permission too, limited to calls that come through the URL.
   InvokePermission:
     Type: AWS::Lambda::Permission
     Properties:
       FunctionName: !Ref Function
       Action: lambda:InvokeFunction
       Principal: "*"
+      InvokedViaFunctionUrl: true
 Outputs:
   FunctionUrl:
     Value: !GetAtt Url.FunctionUrl

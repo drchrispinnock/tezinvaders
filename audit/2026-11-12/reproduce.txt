@@ -1,0 +1,38 @@
+Local audit reproductions
+=========================
+
+Run from the repository root. No live wallet or AWS credentials are used by
+these scripts. The embedded signing key is the repository's public test key.
+
+Verifier seed bypass:
+  node audit/2026-11-12/replay-repro.mjs
+
+This deliberately uses the unmodified vulnerable verifier. It prints differing
+random outcomes and retries up to 100 local signing requests. The probability
+and attempt count vary; no requests are sent to the hosted verifier.
+
+Contract findings:
+  /opt/homebrew/bin/bash contract/scripts/test-mockup.sh --keep
+  python3 audit/2026-11-12/contract-repro.py
+
+On another system, substitute Bash 4.4+ for /opt/homebrew/bin/bash. This first
+command recreates contract/.mockup using throwaway bootstrap accounts and runs
+the existing suite. The second command relies on that suite's resulting state
+and changes only this local mockup. Recreate it before repeating the checks.
+
+The extra contract checks demonstrate:
+  - two successful mints with the same Advent proof after transferring out;
+  - 1 tez accepted by update_operators but not included in pool accounting;
+  - a normally recorded Advent game re-attested and accepted in two rounds.
+
+The test administrator advances the local round to avoid waiting for wall-clock
+time. Re-attestation itself requires no administrative action. In a deployed
+contract, it works when an ordinary round change occurs while the same Advent
+day seed is still accepted, with a new ticket purchased in each round.
+
+SSL_CERT_FILE is set to /etc/ssl/cert.pem for the local Octez subprocesses on
+macOS. Use the appropriate CA bundle path on other operating systems.
+
+Evidence files record the observed runs before any fixes. Reproductions that
+cease to succeed after a fix are expected; these are demonstrations of the
+original defects, not a replacement for rejection-oriented regression tests.

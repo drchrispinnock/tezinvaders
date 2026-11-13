@@ -6,6 +6,8 @@ import { config, hasContract } from "./config";
 
 interface TzktAccount { address: string; alias: string | null }
 
+const TZ_ADDRESS = /^tz[1-5][1-9A-HJ-NP-Za-km-z]{33}$/;
+
 /** address → alias, for every address asked about so far (null when TzKT has no alias). */
 const cache = new Map<string, string | null>();
 
@@ -23,7 +25,8 @@ export async function resolveAliases(addresses: Iterable<string>, fetchFn: typeo
       if (!res.ok) continue;
       const accounts = (await res.json()) as TzktAccount[];
       for (const a of accounts) {
-        cache.set(a.address, a.alias);
+        if (typeof a.address !== "string" || !TZ_ADDRESS.test(a.address)) continue;
+        cache.set(a.address, typeof a.alias === "string" ? a.alias : null);
         if (a.alias) learned = true;
       }
       // Addresses TzKT has never seen are missing from the answer; remember that too.
@@ -52,8 +55,11 @@ async function readScoreMap(name: "scores" | "best", limit: number, fetchFn: typ
   if (!config.tzktApi || !hasContract()) return [];
   const res = await fetchFn(`${config.tzktApi}/v1/contracts/${config.contractAddress}/bigmaps/${name}/keys?active=true&limit=10000&select=key,value`);
   if (!res.ok) throw new Error(`TzKT ${res.status}`);
-  const rows = (await res.json()) as { key: string; value: string }[];
-  return rows.map((r) => ({ address: r.key, score: Number(r.value) }))
+  // Indexer JSON is untrusted: only well-formed addresses and numeric scores reach the page.
+  const rows = (await res.json()) as { key: unknown; value: unknown }[];
+  return rows
+    .filter((r): r is { key: string; value: string } => typeof r.key === "string" && TZ_ADDRESS.test(r.key) && typeof r.value === "string" && /^\d+$/.test(r.value))
+    .map((r) => ({ address: r.key, score: Number(r.value) }))
     .sort((a, b) => b.score - a.score || a.address.localeCompare(b.address)).slice(0, limit);
 }
 
@@ -62,8 +68,8 @@ export async function readTokenIds(address: string, fetchFn: typeof fetch = fetc
   if (!config.tzktApi || !hasContract()) return new Set();
   const res = await fetchFn(`${config.tzktApi}/v1/tokens/balances?account=${address}&token.contract=${config.contractAddress}&balance.gt=0&select=token.tokenId&limit=1000`);
   if (!res.ok) throw new Error(`TzKT ${res.status}`);
-  const ids = (await res.json()) as (string | number)[];
-  return new Set(ids.map(Number));
+  const ids = (await res.json()) as unknown[];
+  return new Set(ids.map(Number).filter((n) => Number.isInteger(n) && n >= 0));
 }
 
 /**

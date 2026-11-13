@@ -1,0 +1,6 @@
+{"test":"same log and outer seed","outerSeed":4242,"finalSeed":2970508495,"phase":"gameover","score":670}
+{"test":"same log and outer seed","outerSeed":4242,"finalSeed":1265937797,"phase":"gameover","score":600}
+{"test":"same log and outer seed","outerSeed":4242,"finalSeed":1070152405,"phase":"gameover","score":630}
+{"test":"real signing path accepts multi-game replay","attempts":9,"score":760,"proofPrefix":"edsig"}
+{"accepted":true,"histogram":{"the replay scored 680, not 760":1,"the replay scored 690, not 760":2,"the replay scored 800, not 760":1,"the replay scored 610, not 760":1,"the replay scored 330, not 760":1,"the replay scored 730, not 760":1,"the replay scored 750, not 760":1}}
+{"test":"single-game control","seed":4242,"phase":"gameover","score":730}

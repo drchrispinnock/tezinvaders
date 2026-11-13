@@ -1,7 +1,11 @@
 // HTTP handling shared by the plain Node server and the Lambda handler: one endpoint,
 // POST /attest with an AttestRequest JSON body, answering an Attestation or { error }.
 
-import { ClaimError, attest, verifierPublicKey, type AttestRequest } from "./attest.ts";
+import networks from "../src/chain/networks.json" with { type: "json" };
+import { ClaimError, attest, verifierPublicKey, type AttestRequest, type KnownNetwork } from "./attest.ts";
+
+/** The contracts the verifier attests for: every configured network with an address. */
+const KNOWN: readonly KnownNetwork[] = (networks.networks as KnownNetwork[]).filter((n) => n.contractAddress);
 
 export const MAX_BODY_BYTES = 4 * 1024 * 1024;
 
@@ -34,7 +38,7 @@ export async function handle(method: string, path: string, body: string, keys: V
   let req: AttestRequest;
   try { req = JSON.parse(body) as AttestRequest; } catch { return { status: 400, body: JSON.stringify({ error: "bad JSON" }) }; }
   try {
-    return { status: 200, body: JSON.stringify(await attest(keyFor(keys, req.chainId), req)) };
+    return { status: 200, body: JSON.stringify(await attest(keyFor(keys, req.chainId), req, Date.now(), { networks: KNOWN, fetchFn: fetch })) };
   } catch (e) {
     if (e instanceof ClaimError) return { status: 422, body: JSON.stringify({ error: e.message }) };
     console.error(e);

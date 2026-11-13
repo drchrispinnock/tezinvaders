@@ -1,0 +1,3 @@
+{"test": "same proof mints twice after transfer", "recipientBefore": 1, "recipientAfter": 3, "claimantAfter": 0}
+{"test": "tez accepted outside play is not accounted for", "poolMutez": "0", "actualBalance": "1 \ua729"}
+{"test": "one Advent recording accepted in two rounds", "rounds": [4, 5], "seed": 2420984589, "score": 640}

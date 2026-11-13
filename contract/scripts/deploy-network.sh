@@ -31,8 +31,9 @@ if [ "${balance:-0}" -lt 5000000 ]; then
 fi
 [ -n "$EXISTING" ] && echo "note: $NAME already has $EXISTING; the new contract replaces it in networks.json"
 
-wait=(); [ "$LAYER" = l2 ] && wait=(--no-wait)   # the Tezos X node never reports confirmations
-out=$(node "$HERE/originate.ts" --rpc "$RPC" --admin "$ADMIN" --verifier "$VERIFIER" --fee "${FEE_MUTEZ:-1000000}" --round-length "${ROUND_LENGTH:-86400}" "${wait[@]}" 2>&1) || { echo "$out" | grep -v "^\s*at " | tail -15; echo "origination failed" >&2; exit 1; }
+wait=""; [ "$LAYER" = l2 ] && wait="--no-wait"   # the Tezos X node never reports confirmations (plain string: macOS bash 3.2 chokes on empty arrays)
+# shellcheck disable=SC2086
+out=$(node "$HERE/originate.ts" --rpc "$RPC" --admin "$ADMIN" --verifier "$VERIFIER" --fee "${FEE_MUTEZ:-1000000}" --round-length "${ROUND_LENGTH:-86400}" $wait 2>&1) || { echo "$out" | grep -v "^\s*at " | tail -15; echo "origination failed" >&2; exit 1; }
 hash=$(echo "$out" | sed -n "s/.*Operation hash is '\([^']*\)'.*/\1/p")
 kt=$(echo "$out" | sed -n "s/.*New contract \(KT1[1-9A-HJ-NP-Za-km-z]*\) originated.*/\1/p")
 if [ -z "$kt" ]; then echo "$out" | tail -15; echo "origination failed" >&2; exit 1; fi

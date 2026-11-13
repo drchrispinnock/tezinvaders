@@ -1,0 +1,27 @@
+Source commit: 960da2d3b6d04ab8acdce9b0c08fb2b02d2b6631
+
+npm test: 36 passed, 11 test files passed.
+npm run typecheck: passed.
+Homebrew Bash contract/scripts/test-mockup.sh --keep: 120 passed, 0 failed.
+
+Local verifier reproduction: accepted a restarted recording on attempt 9 with
+claimed score 760; repeated identical seed/log combinations changed their actual
+final seeds and scores. See replay-evidence.jsonl.
+
+Local contract reproductions:
+  Same proof mints after transfer: recipient balance 1 -> 3.
+  Unexpected tez: pool 0 mutez; actual contract balance 1 tez.
+  Same Advent recording: score 640 accepted in rounds 4 and 5.
+See contract-evidence.jsonl.
+
+Expanded Michelson comparison: all four configured testnet contracts matched.
+See deployed-code-comparison.json.
+
+Reproduction JavaScript syntax and Python compilation checks: passed.
+Application source was not modified; only audit/ files were added.
+
+The original contract-test command under macOS Bash failed before running any
+contract checks because an empty array was treated as unbound. Running with
+Homebrew Bash resolved this. Octez's macOS trust-store access was blocked in the
+sandbox; the baseline suite ran outside it. Later local mockup checks used an
+explicit system CA bundle. No live transaction was submitted.
